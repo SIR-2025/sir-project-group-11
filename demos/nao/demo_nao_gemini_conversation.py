@@ -1,7 +1,7 @@
 import asyncio
 from google import genai
 from google.genai import types
-from sic_framework.devices.nao import NaoqiTextToSpeechRequest
+from sic_framework.devices.nao import NaoqiTextToSpeechRequest, NaoqiLEDRequest
 
 from sic_framework.core.sic_application import SICApplication
 from sic_framework.core import sic_logging
@@ -18,7 +18,22 @@ class NaoGeminiConversation(SICApplication):
     - Buffers Gemini text output and waits for generation_complete.
     - Sends the full text to NAO TTS.
     - Uses function calling to trigger NAO dance when user asks for it.
+    - Uses function calling to change LED colors based on emotional state.
     """
+
+    # Extended emotion-to-color mapping (RGB hex values)
+    LED_COLORS = {
+        "happy": 0x00FF00,        # Green
+        "sad": 0x0000FF,          # Blue
+        "frustrated": 0xFF0000,   # Red
+        "neutral": 0xFFFFFF,      # White
+        "excited": 0xFFFF00,      # Yellow
+        "curious": 0x8000FF,      # Purple
+        "thinking": 0x00FFFF,     # Cyan
+        "confident": 0x00AA00,    # Dark Green
+        "uncertain": 0xFF8000,    # Orange
+        "apologetic": 0xFF00FF,   # Magenta
+    }
 
     def __init__(self):
         super(NaoGeminiConversation, self).__init__()
@@ -43,6 +58,71 @@ class NaoGeminiConversation(SICApplication):
     # -------------------------------------------------------------------------
     # NAO-side actions
     # -------------------------------------------------------------------------
+    def set_led_color(self, emotion: str):
+        """
+        Set NAO's eye and chest LED colors based on emotion.
+
+        Args:
+            emotion: The emotional state (must be in LED_COLORS dict)
+        """
+        if emotion not in self.LED_COLORS:
+            self.logger.warning(f"Unknown emotion: {emotion}. Using neutral.")
+            emotion = "neutral"
+
+        color = self.LED_COLORS[emotion]
+        self.logger.info(f"Setting LEDs to {emotion} (color: {hex(color)})")
+
+        # Set eye LEDs
+        self.nao.leds.request(
+            NaoqiLEDRequest("FaceLeds", color, block=False)
+        )
+
+        # Set chest LED
+        self.nao.leds.request(
+            NaoqiLEDRequest("ChestLeds", color, block=False)
+        )
+
+    # Individual LED color methods for each emotion (for tool calls)
+    async def set_led_happy(self):
+        """Set LEDs to happy (green)."""
+        self.set_led_color("happy")
+
+    async def set_led_sad(self):
+        """Set LEDs to sad (blue)."""
+        self.set_led_color("sad")
+
+    async def set_led_frustrated(self):
+        """Set LEDs to frustrated (red)."""
+        self.set_led_color("frustrated")
+
+    async def set_led_neutral(self):
+        """Set LEDs to neutral (white)."""
+        self.set_led_color("neutral")
+
+    async def set_led_excited(self):
+        """Set LEDs to excited (yellow)."""
+        self.set_led_color("excited")
+
+    async def set_led_curious(self):
+        """Set LEDs to curious (purple)."""
+        self.set_led_color("curious")
+
+    async def set_led_thinking(self):
+        """Set LEDs to thinking (cyan)."""
+        self.set_led_color("thinking")
+
+    async def set_led_confident(self):
+        """Set LEDs to confident (dark green)."""
+        self.set_led_color("confident")
+
+    async def set_led_uncertain(self):
+        """Set LEDs to uncertain (orange)."""
+        self.set_led_color("uncertain")
+
+    async def set_led_apologetic(self):
+        """Set LEDs to apologetic (magenta)."""
+        self.set_led_color("apologetic")
+
     async def perform_nao_dance(self, style: str | None = None):
         """
         Run a dance routine on NAO.
@@ -110,9 +190,7 @@ class NaoGeminiConversation(SICApplication):
 
             if name == "start_dance":
                 style = args.get("style")
-                # Run NAO dance synchronously here
                 await self.perform_nao_dance(style)
-
                 function_responses.append(
                     types.FunctionResponse(
                         id=call_id,
@@ -121,7 +199,86 @@ class NaoGeminiConversation(SICApplication):
                     )
                 )
 
-            # You can add more tools here with additional elif blocks.
+            # LED emotion tools
+            elif name == "set_led_happy":
+                await self.set_led_happy()
+                function_responses.append(
+                    types.FunctionResponse(
+                        id=call_id, name=name, response={"result": "ok", "emotion": "happy"}
+                    )
+                )
+
+            elif name == "set_led_sad":
+                await self.set_led_sad()
+                function_responses.append(
+                    types.FunctionResponse(
+                        id=call_id, name=name, response={"result": "ok", "emotion": "sad"}
+                    )
+                )
+
+            elif name == "set_led_frustrated":
+                await self.set_led_frustrated()
+                function_responses.append(
+                    types.FunctionResponse(
+                        id=call_id, name=name, response={"result": "ok", "emotion": "frustrated"}
+                    )
+                )
+
+            elif name == "set_led_neutral":
+                await self.set_led_neutral()
+                function_responses.append(
+                    types.FunctionResponse(
+                        id=call_id, name=name, response={"result": "ok", "emotion": "neutral"}
+                    )
+                )
+
+            elif name == "set_led_excited":
+                await self.set_led_excited()
+                function_responses.append(
+                    types.FunctionResponse(
+                        id=call_id, name=name, response={"result": "ok", "emotion": "excited"}
+                    )
+                )
+
+            elif name == "set_led_curious":
+                await self.set_led_curious()
+                function_responses.append(
+                    types.FunctionResponse(
+                        id=call_id, name=name, response={"result": "ok", "emotion": "curious"}
+                    )
+                )
+
+            elif name == "set_led_thinking":
+                await self.set_led_thinking()
+                function_responses.append(
+                    types.FunctionResponse(
+                        id=call_id, name=name, response={"result": "ok", "emotion": "thinking"}
+                    )
+                )
+
+            elif name == "set_led_confident":
+                await self.set_led_confident()
+                function_responses.append(
+                    types.FunctionResponse(
+                        id=call_id, name=name, response={"result": "ok", "emotion": "confident"}
+                    )
+                )
+
+            elif name == "set_led_uncertain":
+                await self.set_led_uncertain()
+                function_responses.append(
+                    types.FunctionResponse(
+                        id=call_id, name=name, response={"result": "ok", "emotion": "uncertain"}
+                    )
+                )
+
+            elif name == "set_led_apologetic":
+                await self.set_led_apologetic()
+                function_responses.append(
+                    types.FunctionResponse(
+                        id=call_id, name=name, response={"result": "ok", "emotion": "apologetic"}
+                    )
+                )
 
         if function_responses:
             await self.gemini_session.send_tool_response(
@@ -159,6 +316,60 @@ class NaoGeminiConversation(SICApplication):
             },
         }
 
+        # Define LED emotion tools
+        led_tools = [
+            {
+                "name": "set_led_happy",
+                "description": "Set NAO's eye and chest LEDs to green (happy emotion). Use when expressing joy, happiness, or positive emotions.",
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "set_led_sad",
+                "description": "Set NAO's eye and chest LEDs to blue (sad emotion). Use when expressing sadness, disappointment, or melancholy.",
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "set_led_frustrated",
+                "description": "Set NAO's eye and chest LEDs to red (frustrated/angry emotion). Use when expressing frustration, anger, or irritation.",
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "set_led_neutral",
+                "description": "Set NAO's eye and chest LEDs to white (neutral emotion). Use for neutral, calm, or default states.",
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "set_led_excited",
+                "description": "Set NAO's eye and chest LEDs to yellow (excited emotion). Use when expressing excitement, enthusiasm, or high energy.",
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "set_led_curious",
+                "description": "Set NAO's eye and chest LEDs to purple (curious emotion). Use when expressing curiosity, interest, or wonder.",
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "set_led_thinking",
+                "description": "Set NAO's eye and chest LEDs to cyan (thinking emotion). Use when processing information, thinking, or contemplating.",
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "set_led_confident",
+                "description": "Set NAO's eye and chest LEDs to dark green (confident emotion). Use when expressing confidence, assurance, or certainty.",
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "set_led_uncertain",
+                "description": "Set NAO's eye and chest LEDs to orange (uncertain emotion). Use when expressing uncertainty, confusion, or doubt.",
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "set_led_apologetic",
+                "description": "Set NAO's eye and chest LEDs to magenta (apologetic emotion). Use when apologizing or expressing regret.",
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
+        ]
+
         config = {
             "response_modalities": ["TEXT"],
             "system_instruction": (
@@ -166,10 +377,25 @@ class NaoGeminiConversation(SICApplication):
                 "Use clear punctuation. "
                 "When the user asks you to dance or refers to you doing a dance, "
                 "call the 'start_dance' tool instead of just answering in text. "
-                "You can also say a short line before or after the dance."
+                "\n\n"
+                "IMPORTANT: You have LED lights on your eyes and chest that can display emotions. "
+                "You MUST call the appropriate LED emotion tool (set_led_*) at the START of your response "
+                "to match the emotional tone of what you're about to say. "
+                "Choose from: happy (green), sad (blue), frustrated (red), neutral (white), "
+                "excited (yellow), curious (purple), thinking (cyan), confident (dark green), "
+                "uncertain (orange), or apologetic (magenta). "
+                "\n\n"
+                "For example:\n"
+                "- If answering a question confidently, call set_led_confident first\n"
+                "- If expressing frustration or saying you can't do something, call set_led_frustrated\n"
+                "- If expressing curiosity about something the user said, call set_led_curious\n"
+                "- If thinking or processing, call set_led_thinking\n"
+                "- Default to set_led_neutral for routine responses\n"
+                "\n"
+                "Always set your LEDs to match your emotional tone before or during your verbal response."
             ),
             "tools": [
-                {"function_declarations": [start_dance_tool]},
+                {"function_declarations": [start_dance_tool] + led_tools},
             ],
         }
 
