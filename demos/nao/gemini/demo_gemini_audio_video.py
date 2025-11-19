@@ -37,7 +37,7 @@ class NaoGeminiConversation(SICApplication):
     def __init__(self):
         super(NaoGeminiConversation, self).__init__()
 
-        self.nao_ip = "10.0.0.242"
+        self.nao_ip = "10.0.0.243"
 
         self.nao = None
         self.gemini_session = None
@@ -361,7 +361,7 @@ class NaoGeminiConversation(SICApplication):
     # Gemini Live main loop
     # -------------------------------------------------------------------------
     async def run_gemini(self):
-        client = genai.Client()  # uses GOOGLE_API_KEY
+        client = genai.Client(api_key='AIzaSyByaVJkD9c4dxd-7Rb81hucbP-fTZ8HbFA')  # uses GOOGLE_API_KEY
         model = "gemini-live-2.5-flash-preview"
 
         start_dance_tool = {
