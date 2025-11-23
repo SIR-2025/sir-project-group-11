@@ -13,3 +13,9 @@ Template for group projects of Socially Intelligent Robotics (SIR) of the Vrije 
 # Information
 - More info about SIC: https://social-ai-vu.github.io/social-interaction-cloud/index.html
 - More info about SIR: Canvas
+
+# CODE WEEK 4
+For the first submission/check fo the code, the following files are the relevant ones:
+- demo_nao_gemini_conversation: this file connects the NAO robot to a Gemini API. By doing this, NAO is able to receive audio and visual input, therefore, conversing with the agent. 
+- demo_nao_motion_player: since we are recording different movements/gestures we want the NAO robot to perfrom, the motion_recorder file was modified in order to exclusively replay the motions that we have come up with. 
+- negative_reactions and positive_reactions folders contain different reactions recorder by us which NAO will perform throughout the HRI. 
