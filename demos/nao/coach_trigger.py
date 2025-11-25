@@ -58,7 +58,7 @@ class NaoGeminiConversation(SICApplication):
 
         elif style == "good": 
             self.logger.info(f"Trigger {style} detected! Replaying specific recording...")
-            # Randomly select a negative reaction motion 
+            # Randomly select a positive reaction motion 
             self.motion_name = random.choice(self.positive_reactions)
             await asyncio.to_thread(self._execute_replay_logic)
         else:
