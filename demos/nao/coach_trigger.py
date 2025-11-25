@@ -56,7 +56,7 @@ class NaoGeminiConversation(SICApplication):
         motion_chains = {"negative_reactions/motion_stupidx3":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'], 
                          "negative_reactions/motion_no_no_no":['HeadYaw', 'HeadPitch'],
                          "negative_reactions/motion_oh_man":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
-                         "negative_reactions/motion_desperation_and_disappointment":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch', 'RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'RAnkleRoll', 'LAnkleRoll', 'LAnkleRoll', 'RHipYawPitch', 'LHipYawPitch', 'RHipRoll', 'LHipRoll', 'RHipPitch', 'LHipPitch'],
+                         "negative_reactions/motion_desperation_and_disappointment":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch', 'RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'RAnkleRoll', 'LAnkleRoll', 'RHipYawPitch', 'LHipYawPitch', 'RHipRoll', 'LHipRoll', 'RHipPitch', 'LHipPitch'],
                          "positive_reactions/motion_clapping":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
                          "positive_reactions/motion_mwak":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
                          "positive_reactions/motion_yay":['RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowRoll', 'RElbowYaw', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
@@ -86,6 +86,7 @@ class NaoGeminiConversation(SICApplication):
 
     def _execute_replay_logic(self):
         try:
+            self.nao.autonomous.request(NaoWakeUpRequest())
             self.logger.info("Replaying action (Stiffness -> Load -> Play)")
             
             self.nao.stiffness.request(
@@ -94,7 +95,7 @@ class NaoGeminiConversation(SICApplication):
             
             recording = NaoqiMotionRecording.load(self.motion_name)
             self.nao.motion_record.request(PlayRecording(recording))
-            
+            self.nao.autonomous.request(NaoRestRequest())
         except Exception as e:
             self.logger.error(f"Error replaying motion: {e}")
 
@@ -152,7 +153,7 @@ class NaoGeminiConversation(SICApplication):
                 "properties": {
                     "style": {
                         "type": "string",
-                        "description": "The style of motion. Use 'coach' if the user says that word.",
+                        "description": "The style of motion. Use 'coach' if the user says that word and 'good' if the user says that word.",
                     },
                 },
                 "required": [],
@@ -166,6 +167,8 @@ class NaoGeminiConversation(SICApplication):
                 "Use clear punctuation. "
                 "If the user says the word 'Coach' or 'Coach me', you MUST call the "
                 "'start_dance' tool with the style set to 'coach'. "
+                "If the user says the word 'Good', 'Good job' or 'Well done', you MUST call the "
+                "'start_dance' tool with the style set to 'good'. "
                 "For other requests, use 'happy' or 'random'."
             ),
             "tools": [
