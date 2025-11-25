@@ -7,6 +7,7 @@ from sic_framework.core.sic_application import SICApplication
 from sic_framework.core import sic_logging
 from sic_framework.devices import Nao
 from sic_framework.core.message_python2 import AudioMessage
+from sic_framework.devices.common_naoqi.naoqi_autonomous import NaoRestRequest, NaoWakeUpRequest
 
 from sic_framework.devices.common_naoqi.naoqi_motion_recorder import (
     NaoqiMotionRecorderConf,
@@ -14,7 +15,6 @@ from sic_framework.devices.common_naoqi.naoqi_motion_recorder import (
     PlayRecording,
 )
 from sic_framework.devices.common_naoqi.naoqi_stiffness import Stiffness
-from sic_framework.devices.common_naoqi.naoqi_autonomous import NaoRestRequest
 
 import random
 
@@ -47,6 +47,8 @@ class NaoGeminiConversation(SICApplication):
         conf = NaoqiMotionRecorderConf(use_sensors=True)
         self.nao = Nao(ip=self.nao_ip, motion_record_conf=conf)
 
+        self.nao.autonomous.request(NaoWakeUpRequest())
+
     async def perform_nao_dance(self, style: str | None = None):
         self.logger.info(f"NAO dance requested with style: {style}")
 
@@ -65,6 +67,7 @@ class NaoGeminiConversation(SICApplication):
             # Randomly select a negative reaction motion 
             self.motion_name = random.choice(self.negative_reactions)
             self.chain = motion_chains[self.motion_name]
+            # TODO: Change eye's LEDs to red color to indicate coach mode
             await asyncio.to_thread(self._execute_replay_logic)
 
         elif style == "good": 
@@ -72,6 +75,7 @@ class NaoGeminiConversation(SICApplication):
             # Randomly select a positive reaction motion 
             self.motion_name = random.choice(self.positive_reactions)
             self.chain = motion_chains[self.motion_name]
+            # TODO: Change eye's LEDs to green color to indicate positive reaction
             await asyncio.to_thread(self._execute_replay_logic)
         
         else:
@@ -137,7 +141,7 @@ class NaoGeminiConversation(SICApplication):
             )
 
     async def run_gemini(self):
-        client = genai.Client(api_key=)
+        client = genai.Client(api_key="YOUR_API_KEY_HERE")
         model = "gemini-live-2.5-flash-preview"
 
         start_dance_tool = {
