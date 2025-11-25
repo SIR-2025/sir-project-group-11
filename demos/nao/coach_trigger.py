@@ -115,7 +115,7 @@ class NaoGeminiConversation(SICApplication):
             )
 
     async def run_gemini(self):
-        client = genai.Client(api_key='AIzaSyByaVJkD9c4dxd-7Rb81hucbP-fTZ8HbFA')
+        client = genai.Client(api_key=)
         model = "gemini-live-2.5-flash-preview"
 
         start_dance_tool = {
