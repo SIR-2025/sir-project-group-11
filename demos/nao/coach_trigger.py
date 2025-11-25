@@ -26,9 +26,9 @@ class NaoGeminiConversation(SICApplication):
 
         self.negative_reactions = ["negative_reactions/motion_stupidx3", "negative_reactions/motion_no_no_no", "negative_reactions/motion_oh_man", "negative_reactions/motion_desperation_and_disappointment"]
         self.positive_reactions = ["positive_reactions/motion_clapping", "positive_reactions/motion_mwak", "positive_reactions/motion_yay", "positive_reactions/motion_yay"]
-        
+
         self.motion_name = None
-        self.chain = ['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'] # , 'RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'RAnkleRoll', 'LAnkleRoll', 'RHipYawPitch', 'LHipYawPitch', 'RHipRoll', 'LHipRoll', 'RHipPitch', 'LHipPitch']
+        self.chain = None
 
         self.nao = None
         self.gemini_session = None
@@ -50,17 +50,30 @@ class NaoGeminiConversation(SICApplication):
     async def perform_nao_dance(self, style: str | None = None):
         self.logger.info(f"NAO dance requested with style: {style}")
 
+        # {motion:chain} dictionary for different reactions
+        motion_chains = {"negative_reactions/motion_stupidx3":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'], 
+                         "negative_reactions/motion_no_no_no":['HeadYaw', 'HeadPitch'],
+                         "negative_reactions/motion_oh_man":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
+                         "negative_reactions/motion_desperation_and_disappointment":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch', 'RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'RAnkleRoll', 'LAnkleRoll', 'LAnkleRoll', 'RHipYawPitch', 'LHipYawPitch', 'RHipRoll', 'LHipRoll', 'RHipPitch', 'LHipPitch'],
+                         "positive_reactions/motion_clapping":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
+                         "positive_reactions/motion_mwak":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
+                         "positive_reactions/motion_yay":['RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowRoll', 'RElbowYaw', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
+                         "positive_reactions/motion_yeah":['HeadYaw', 'HeadPitch']}
+
         if style == "coach": # TODO: change to negative word to trigger negative reactions
             self.logger.info(f"Trigger {style} detected! Replaying specific recording...")
             # Randomly select a negative reaction motion 
             self.motion_name = random.choice(self.negative_reactions)
+            self.chain = motion_chains[self.motion_name]
             await asyncio.to_thread(self._execute_replay_logic)
 
         elif style == "good": 
             self.logger.info(f"Trigger {style} detected! Replaying specific recording...")
             # Randomly select a positive reaction motion 
             self.motion_name = random.choice(self.positive_reactions)
+            self.chain = motion_chains[self.motion_name]
             await asyncio.to_thread(self._execute_replay_logic)
+        
         else:
             self.logger.info("Standard dance requested.")
             await asyncio.sleep(2)
@@ -124,7 +137,7 @@ class NaoGeminiConversation(SICApplication):
             )
 
     async def run_gemini(self):
-        client = genai.Client(api_key="AIzaSyCtVET4L9v2d2o_Bsg-8rIlRdm79lrdcWU")
+        client = genai.Client(api_key=)
         model = "gemini-live-2.5-flash-preview"
 
         start_dance_tool = {
