@@ -18,7 +18,7 @@ from sic_framework.devices.common_naoqi.naoqi_stiffness import Stiffness
 
 # Import libraries necessary for the demo
 import time
-
+import random
 
 class NaoMotionRecorderDemo(SICApplication):
     """
@@ -31,10 +31,16 @@ class NaoMotionRecorderDemo(SICApplication):
         super(NaoMotionRecorderDemo, self).__init__()
         
         # Demo-specific initialization
-        self.nao_ip = "10.0.0.242"
-        self.motion_name = "negative_reactions/motion_stupidx3" # TODO: change to motion name you want to replay
+        self.nao_ip = "10.0.0.243"
+
+        self.negative_reactions = ["negative_reactions/motion_stupidx3", "negative_reactions/motion_no_no_no", "negative_reactions/motion_oh_man", "negative_reactions/motion_desperation_and_disappointment"]
+        self.positive_reactions = ["positive_reactions/motion_clapping", "positive_reactions/motion_mwak", "positive_reactions/motion_yay", "positive_reactions/motion_yay"]
+        self.all_reactions = self.negative_reactions + self.positive_reactions
+        
+        self.motion_name = None
+
+        self.chain = None        
         self.nao = None
-        self.chain = ['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'] # , 'RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'RAnkleRoll', 'LAnkleRoll', 'RHipYawPitch', 'LHipYawPitch', 'RHipRoll', 'LHipRoll', 'RHipPitch', 'LHipPitch']
 
         self.set_log_level(sic_logging.INFO)
         
@@ -45,7 +51,7 @@ class NaoMotionRecorderDemo(SICApplication):
     
     def setup(self):
         """Initialize and configure the NAO robot."""
-        self.logger.info("Starting NAO Motion Recorder Demo...")
+        self.logger.info("Starting NAO Motion Player Demo...")
         
         # Initialize NAO with motion recorder configuration
         conf = NaoqiMotionRecorderConf(use_sensors=True)
@@ -57,16 +63,29 @@ class NaoMotionRecorderDemo(SICApplication):
 
             self.nao.autonomous.request(NaoWakeUpRequest())
 
+            # select a random motion from the list  
+            motion_chains = {"negative_reactions/motion_stupidx3":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'], 
+                    "negative_reactions/motion_no_no_no":['HeadYaw', 'HeadPitch'],
+                    "negative_reactions/motion_oh_man":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
+                    "negative_reactions/motion_desperation_and_disappointment":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch', 'RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'RAnkleRoll', 'LAnkleRoll', 'LAnkleRoll', 'RHipYawPitch', 'LHipYawPitch', 'RHipRoll', 'LHipRoll', 'RHipPitch', 'LHipPitch'],
+                    "positive_reactions/motion_clapping":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
+                    "positive_reactions/motion_mwak":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
+                    "positive_reactions/motion_yay":['RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowRoll', 'RElbowYaw', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
+                    "positive_reactions/motion_yeah":['HeadYaw', 'HeadPitch']}
+
+            self.motion_name = random.choice(self.all_reactions)
+            self.chain = motion_chains[self.motion_name]
+
             self.logger.info("Replaying action")
             self.nao.stiffness.request(
                 Stiffness(stiffness=0.7, joints=self.chain)
-            )  
+            )
             recording = NaoqiMotionRecording.load(self.motion_name)
             self.nao.motion_record.request(PlayRecording(recording))
 
             # always end with a rest, whenever you reach the end of your code
             self.nao.autonomous.request(NaoRestRequest())
-            self.logger.info("Motion recorder demo completed successfully")
+            self.logger.info("Motion player demo completed successfully")
         except Exception as e:
             self.logger.error("Exception: {}".format(e=e))
         finally:
