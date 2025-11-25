@@ -16,6 +16,7 @@ from sic_framework.devices.common_naoqi.naoqi_motion_recorder import (
 from sic_framework.devices.common_naoqi.naoqi_stiffness import Stiffness
 from sic_framework.devices.common_naoqi.naoqi_autonomous import NaoRestRequest
 
+import random
 
 class NaoGeminiConversation(SICApplication):
     def __init__(self):
@@ -23,8 +24,11 @@ class NaoGeminiConversation(SICApplication):
 
         self.nao_ip = "10.0.0.243"
 
-        self.motion_name = r"C:\Users\sofro\OneDrive\Computer\sir-project-group-11\demos\nao\negative_reactions\motion_stupidx3"
-        self.chain = ['HeadYaw', 'HeadPitch'] 
+        self.negative_reactions = ["negative_reactions/motion_stupidx3", "negative_reactions/motion_no_no_no", "negative_reactions/motion_oh_man", "negative_reactions/motion_desperation_and_disappointment"]
+        self.positive_reactions = ["positive_reactions/motion_clapping", "positive_reactions/motion_mwak", "positive_reactions/motion_yay", "positive_reactions/motion_yay"]
+        
+        self.motion_name = None
+        self.chain = ['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'] # , 'RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'RAnkleRoll', 'LAnkleRoll', 'RHipYawPitch', 'LHipYawPitch', 'RHipRoll', 'LHipRoll', 'RHipPitch', 'LHipPitch']
 
         self.nao = None
         self.gemini_session = None
@@ -46,11 +50,17 @@ class NaoGeminiConversation(SICApplication):
     async def perform_nao_dance(self, style: str | None = None):
         self.logger.info(f"NAO dance requested with style: {style}")
 
-        if style == "coach":
-            self.logger.info("Trigger 'Coach' detected! Replaying specific recording...")
-
+        if style == "coach": # TODO: change to negative word to trigger negative reactions
+            self.logger.info(f"Trigger {style} detected! Replaying specific recording...")
+            # Randomly select a negative reaction motion 
+            self.motion_name = random.choice(self.negative_reactions)
             await asyncio.to_thread(self._execute_replay_logic)
-            
+
+        elif style == "good": 
+            self.logger.info(f"Trigger {style} detected! Replaying specific recording...")
+            # Randomly select a negative reaction motion 
+            self.motion_name = random.choice(self.positive_reactions)
+            await asyncio.to_thread(self._execute_replay_logic)
         else:
             self.logger.info("Standard dance requested.")
             await asyncio.sleep(2)
@@ -66,7 +76,6 @@ class NaoGeminiConversation(SICApplication):
             )  
             
             recording = NaoqiMotionRecording.load(self.motion_name)
-            
             self.nao.motion_record.request(PlayRecording(recording))
             
         except Exception as e:
@@ -115,7 +124,7 @@ class NaoGeminiConversation(SICApplication):
             )
 
     async def run_gemini(self):
-        client = genai.Client(api_key=)
+        client = genai.Client(api_key="AIzaSyCtVET4L9v2d2o_Bsg-8rIlRdm79lrdcWU")
         model = "gemini-live-2.5-flash-preview"
 
         start_dance_tool = {
