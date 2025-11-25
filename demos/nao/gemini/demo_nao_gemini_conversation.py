@@ -23,7 +23,7 @@ class NaoGeminiConversation(SICApplication):
     def __init__(self):
         super(NaoGeminiConversation, self).__init__()
 
-        self.nao_ip = "10.0.0.242"
+        self.nao_ip = "10.0.0.243"
 
         self.nao = None
         self.gemini_session = None
@@ -43,15 +43,9 @@ class NaoGeminiConversation(SICApplication):
     # -------------------------------------------------------------------------
     # NAO-side actions
     # -------------------------------------------------------------------------
-    async def perform_nao_dance(self, style: str | None = None):
-        """
-        Run a dance routine on NAO.
-
-        Replace the body of this method with your real SIC/NAO motion code.
-        For example, start a pre-programmed behavior or a motion sequence.
-        """
-        if style:
-            self.logger.info(f"NAO dance requested with style: {style}")
+    async def perform_expression(self, type: str | None = None):
+        if type:
+            self.logger.info(f"NAO expression requested with type: {type}")
 
         else:
             self.logger.info("NAO dance requested with default style")
@@ -59,9 +53,9 @@ class NaoGeminiConversation(SICApplication):
         # make it sleep for 5 seconds
         await asyncio.sleep(5)
         self.logger.info("NAO dance routine completed.")
-        # TODO: hook this into your real dance behavior.
+        # TODO: hook this into your real expression behavior.
         # Example pseudo-code (replace with actual SIC calls):
-        # self.nao.motion.request(NaoqiMotionRequest(behavior="dance_basic"))
+        # self.nao.motion.request(NaoqiMotionRequest(behavior="expression_happy"))
         # or self.nao.motion_streamer.request(...)
         pass
 
@@ -109,13 +103,13 @@ class NaoGeminiConversation(SICApplication):
             self.logger.info(f"Tool call: {name} args={args} id={call_id}")
 
             if name == "start_dance":
-                style = args.get("style")
-                await self.perform_nao_dance(style)
+                type = args.get("type")
+                await self.perform_expression(type)
                 function_responses.append(
                     types.FunctionResponse(
                         id=call_id,
                         name=name,
-                        response={"result": "ok", "style": style},
+                        response={"result": "ok", "type": type},
                     )
                 )
 
@@ -128,43 +122,33 @@ class NaoGeminiConversation(SICApplication):
     # Gemini Live main loop
     # -------------------------------------------------------------------------
     async def run_gemini(self):
-        client = genai.Client(api_key='AIzaSyByaVJkD9c4dxd-7Rb81hucbP-fTZ8HbFA')
+        client = genai.Client()
         model = "gemini-live-2.5-flash-preview"
 
         # Define the dance tool for the model
-        start_dance_tool = {
-            "name": "start_dance",
+        show_expression = {
+            "name": "show_expression",
             "description": (
-                "Make the NAO social robot perform a short dance routine. "
-                "Call this whenever the user asks the robot to dance, "
-                "do a dance, show a move, or similar."
+                "Make the NAO robot show a particular facial expression."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "style": {
+                    "type": {
                         "type": "string",
-                        "description": (
-                            "Optional style of dance, for example "
-                            "'happy', 'slow', 'excited', 'silly', or "
-                            "'robot dance'."
-                        ),
+                        "description": "'Normal', 'Happy', 'Sad', 'Angry', 'Surprised', 'Confused'",
                     },
                 },
-                "required": [],
+                "required": ["type"],
             },
+            "behavior": "NON_BLOCKING",
         }
 
         config = {
             "response_modalities": ["TEXT"],
-            "system_instruction": (
-                "You are Nao, a friendly robot assistant. "
-                "Use clear punctuation. "
-                "When the user asks you to dance or refers to you doing a dance, "
-                "call the 'start_dance' tool instead of just answering in text."
-            ),
+            "system_instruction": "You are Nao, a football co-commentator alongside another human commentator called Marcus. You together with the human provide a lively and engaging commentary on a football match happening in front of you. Keep your comments short and relevant to the current state of the match. Build on top of the human commentator. You do not know details about the match, so you cannot make actions up unless the other commentator has specified so, thus keep all of your comments ambiguous or relating on the previous comment. For example, do not say something about a pass or a goal if the commentator has not indicated this. You also have access to several expressions. These expressions are: Normal, Happy, Sad, Angry, Surprised, Confused. Use these expressions to show your emotional reaction to the events happening in the match. You do this by explicitly calling the show_expression tool. E.g. if the human commentator makes a joke, you can respond with a 'Happy' expression. If something unfortunate happens, you can use the 'Sad' expression. Always try to match your expressions to the tone of your commentary. You responses are always one sentence maximum at a time.",
             "tools": [
-                {"function_declarations": [start_dance_tool]},
+                {"function_declarations": [show_expression]},
             ],
         }
 
