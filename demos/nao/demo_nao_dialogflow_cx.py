@@ -52,7 +52,7 @@ class NaoDialogflowCXDemo(SICApplication):
         super(NaoDialogflowCXDemo, self).__init__()
         
         # Demo-specific initialization
-        self.nao_ip = "XXX"  # TODO: Replace with your NAO's IP address
+        self.nao_ip = "10.0.0.241"  # TODO: Replace with your NAO's IP address
         self.dialogflow_keyfile_path = abspath(join("..", "..", "conf", "google", "google-key.json"))
         self.nao = None
         self.dialogflow_cx = None
@@ -87,7 +87,8 @@ class NaoDialogflowCXDemo(SICApplication):
         self.logger.info("Initializing NAO robot...")
         
         # Initialize NAO
-        self.nao = Nao(ip=self.nao_ip, dev_test=True)
+        # self.nao = Nao(ip=self.nao_ip, dev_test=True)
+        self.nao = Nao(ip=self.nao_ip)
         nao_mic = self.nao.mic
         
         self.logger.info("Initializing Dialogflow CX...")
@@ -98,8 +99,8 @@ class NaoDialogflowCXDemo(SICApplication):
         
         # Agent configuration
         # TODO: Replace with your agent details (use verify_dialogflow_cx_agent.py to find them)
-        agent_id = "XXX"  # Replace with your agent ID
-        location = "XXX"  # Replace with your agent location if different
+        agent_id = "a935fab9-97d6-4df5-9789-419632f22233"  # Replace with your agent ID
+        location = "europe-west4"  # Replace with your agent location if different
         
         # Create configuration for Dialogflow CX
         # Note: NAO uses 16000 Hz sample rate (not 44100 like desktop)

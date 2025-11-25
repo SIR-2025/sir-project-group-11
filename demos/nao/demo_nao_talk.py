@@ -28,7 +28,7 @@ class NaoTalkDemo(SICApplication):
         super(NaoTalkDemo, self).__init__()
         
         # Demo-specific initialization
-        self.nao_ip = "XXX"
+        self.nao_ip = "10.0.0.242"
         self.nao = None
         
         # Log files will only be written if set_log_file is called. Must be a valid full path to a directory.

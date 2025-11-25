@@ -98,8 +98,8 @@ class DialogflowCXDemo(SICApplication):
         # 4. The agent ID is in the URL: ...agents/YOUR-AGENT-ID/...
         # or in Agent Settings under "Agent ID"
         
-        agent_id = "XXX"  # Replace with your agent ID
-        location = "XXX"  # Replace with your agent location if different
+        agent_id = "a935fab9-97d6-4df5-9789-419632f22233"  # Replace with your agent ID
+        location = "europe-west4"  # Replace with your agent location if different
         
         # Create configuration for Conversational Agents
         ca_conf = DialogflowCXConf(

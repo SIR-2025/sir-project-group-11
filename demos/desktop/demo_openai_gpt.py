@@ -101,8 +101,16 @@ class GPTDemo(SICApplication):
             self.shutdown()
 
 
+# if __name__ == "__main__":
+#     # Create and run the demo
+#     # This will be the single SICApplication instance for the process
+#     demo = GPTDemo(env_path=abspath(join("..", "..", "conf", ".env")))
+#     demo.run()
+
 if __name__ == "__main__":
-    # Create and run the demo
-    # This will be the single SICApplication instance for the process
-    demo = GPTDemo(env_path=abspath(join("..", "..", "conf", ".env")))
+    from os.path import dirname, realpath, join
+    project_root = dirname(dirname(dirname(realpath(__file__))))
+    env_path = join(project_root, "conf", ".env")
+
+    demo = GPTDemo(env_path=env_path)
     demo.run()

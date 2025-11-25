@@ -31,10 +31,10 @@ class NaoMotionRecorderDemo(SICApplication):
         super(NaoMotionRecorderDemo, self).__init__()
         
         # Demo-specific initialization
-        self.nao_ip = "10.0.0.242"
+        self.nao_ip = "10.0.0.243"
         self.motion_name = "negative_reactions/motion_stupidx3" # TODO: change to motion name you want to replay
         self.nao = None
-        self.chain = ['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'] # , 'RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'RAnkleRoll', 'LAnkleRoll', 'RHipYawPitch', 'LHipYawPitch', 'RHipRoll', 'LHipRoll', 'RHipPitch', 'LHipPitch']
+        self.chain = ['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch', 'RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'RAnkleRoll', 'LAnkleRoll', 'RHipYawPitch', 'LHipYawPitch', 'RHipRoll', 'LHipRoll', 'RHipPitch', 'LHipPitch']
 
         self.set_log_level(sic_logging.INFO)
         
