@@ -30,7 +30,7 @@ class NaoTrackerDemo(SICApplication):
         super(NaoTrackerDemo, self).__init__()
         
         # Demo-specific initialization
-        self.nao_ip = "XXX"
+        self.nao_ip = "10.0.0.243"
         self.nao = None
         
         # Log files will only be written if set_log_file is called. Must be a valid full path to a directory.
@@ -51,37 +51,37 @@ class NaoTrackerDemo(SICApplication):
             # Start tracking a face
             target_name = "Face"
             
-            self.logger.info("Enabling head stiffness and starting face tracking...")
+            self.logger.info("Enabling head stiffness...")
             # Enable stiffness so the head joint can be actuated
             self.nao.stiffness.request(Stiffness(stiffness=1.0, joints=["Head"]))
-            self.nao.tracker.request(
-                StartTrackRequest(target_name=target_name, size=0.2, mode="Head", effector="None")
-            )
+            #self.nao.tracker.request(
+            #    StartTrackRequest(target_name=target_name, size=0.2, mode="Head", effector="None")
+            #)
             
             # Wait for a specific time
-            time.sleep(10)
+            #time.sleep(10)
             
             # Unregister target face
-            self.logger.info("Stopping face tracking...")
-            self.nao.tracker.request(RemoveTargetRequest(target_name))
+            #self.logger.info("Stopping face tracking...")
+            #self.nao.tracker.request(RemoveTargetRequest(target_name))
             
             # Start tracking a red ball using nao's arms
             # Set a robot position relative to target so that the robot stays a 30 centimeters (along x axis) with 10 cm threshold
-            self.logger.info("Starting red ball tracking with arms...")
+            self.logger.info("Starting red ball tracking...")
             target_name = "RedBall"
             move_rel_position = [-0.3, 0.0, 0.0, 0.1, 0.1, 0.1]
             self.nao.tracker.request(
                 StartTrackRequest(
                     target_name=target_name,
                     size=0.06,
-                    mode="Move",
-                    effector="Arms",
+                    mode="None",
+                    effector="None",
                     move_rel_position=move_rel_position,
                 )
             )
             
             # Wait for a specific time
-            time.sleep(10)
+            #time.sleep(10)
             
             # Stop tracking everything
             self.logger.info("Stopping all tracking...")
