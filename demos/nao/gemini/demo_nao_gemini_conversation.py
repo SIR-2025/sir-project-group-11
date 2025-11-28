@@ -11,6 +11,8 @@ from sic_framework.core.message_python2 import AudioMessage
 from sic_framework.devices.common_naoqi.naoqi_autonomous import (
     NaoRestRequest,
     NaoWakeUpRequest,
+    NaoBasicAwarenessRequest,
+    NaoBackgroundMovingRequest,
 )
 from sic_framework.devices.common_naoqi.naoqi_motion_recorder import (
     NaoqiMotionRecorderConf,
@@ -186,6 +188,8 @@ class NaoGeminiConversation(SICApplication):
         conf = NaoqiMotionRecorderConf(use_sensors=True)
         self.nao = Nao(ip=self.nao_ip, motion_record_conf=conf)
         self.nao.autonomous.request(NaoWakeUpRequest())
+        self.nao.autonomous.request(NaoBasicAwarenessRequest(True))
+        self.nao.autonomous.request(NaoBackgroundMovingRequest(True))
 
     # -------------------------------------------------------------------------
     # NAO-side actions
