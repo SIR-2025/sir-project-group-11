@@ -1,4 +1,6 @@
 import asyncio
+import time
+import wave
 from google import genai
 from google.genai import types
 
@@ -14,18 +16,26 @@ from sic_framework.devices.common_naoqi.naoqi_motion_recorder import (
     NaoqiMotionRecording,
     PlayRecording,
 )
+from sic_framework.devices.common_naoqi.naoqi_leds import (
+    NaoFadeRGBRequest,
+    NaoLEDRequest,
+)
 from sic_framework.devices.common_naoqi.naoqi_stiffness import Stiffness
+from sic_framework.core.message_python2 import AudioRequest
 
 import random
 
 class NaoGeminiConversation(SICApplication):
+    
     def __init__(self):
         super(NaoGeminiConversation, self).__init__()
 
         self.nao_ip = "10.0.0.243"
 
         self.negative_reactions = ["negative_reactions/motion_stupidx3", "negative_reactions/motion_no_no_no", "negative_reactions/motion_oh_man", "negative_reactions/motion_desperation_and_disappointment"]
-        self.positive_reactions = ["positive_reactions/motion_clapping", "positive_reactions/motion_mwak", "positive_reactions/motion_yay", "positive_reactions/motion_yay"]
+        self.positive_reactions = ["positive_reactions/motion_clapping", "positive_reactions/motion_mwak", "positive_reactions/motion_yay", "positive_reactions/motion_yeah"]
+        
+        self.audio_file = None
 
         self.motion_name = None
         self.chain = None
@@ -38,12 +48,25 @@ class NaoGeminiConversation(SICApplication):
         self.model_is_speaking = False 
         self.buffered_text = [] 
 
+        self.emotion = None
+
         self.set_log_level(sic_logging.INFO)
         self.setup()
 
     def setup(self):
         self.logger.info("Initializing NAO...")
         
+        # Read the wav file
+        self.wavefile = wave.open(self.audio_file, "rb")
+        self.samplerate = self.wavefile.getframerate()
+        
+        self.logger.info("Audio file specs:")
+        self.logger.info("  sample rate: {}".format(self.wavefile.getframerate()))
+        self.logger.info("  length: {}".format(self.wavefile.getnframes()))
+        self.logger.info("  data size in bytes: {}".format(self.wavefile.getsampwidth()))
+        self.logger.info("  number of channels: {}".format(self.wavefile.getnchannels()))
+        self.logger.info("")
+
         conf = NaoqiMotionRecorderConf(use_sensors=True)
         self.nao = Nao(ip=self.nao_ip, motion_record_conf=conf)
 
@@ -62,22 +85,35 @@ class NaoGeminiConversation(SICApplication):
                          "positive_reactions/motion_yay":['RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowRoll', 'RElbowYaw', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
                          "positive_reactions/motion_yeah":['HeadYaw', 'HeadPitch']}
 
+        reaction_and_audio_pair = {"positive_reactions/motion_clapping": "sound_effects/applause.wav",
+                                   "positive_reactions/motion_mwak": "sound_effects/kiss.wav",}
+
         if style == "coach": # TODO: change to negative word to trigger negative reactions
             self.logger.info(f"Trigger {style} detected! Replaying specific recording...")
             # Randomly select a negative reaction motion 
             self.motion_name = random.choice(self.negative_reactions)
             self.chain = motion_chains[self.motion_name]
-            # TODO: Change eye's LEDs to red color to indicate coach mode
+
+            # change LEDs to red color to indicate negative reaction    
+            self.emotion = "Angry"  # Angry emotion
+            self.display_emotion()
+            # replay emotion
             await asyncio.to_thread(self._execute_replay_logic)
+            # NOTE: we still need nao to speak while doing the motion. 
 
         elif style == "good": 
             self.logger.info(f"Trigger {style} detected! Replaying specific recording...")
             # Randomly select a positive reaction motion 
             self.motion_name = random.choice(self.positive_reactions)
             self.chain = motion_chains[self.motion_name]
-            # TODO: Change eye's LEDs to green color to indicate positive reaction
+
+            # change LEDs to gold/orange color to indicate positive reaction    
+            self.emotion = "Happy" # Happy emotion
+            self.display_emotion()
+            # replay emotion
             await asyncio.to_thread(self._execute_replay_logic)
-        
+            # NOTE: we still need nao to speak while doing the motion. 
+            
         else:
             self.logger.info("Standard dance requested.")
             await asyncio.sleep(2)
@@ -95,9 +131,18 @@ class NaoGeminiConversation(SICApplication):
             
             recording = NaoqiMotionRecording.load(self.motion_name)
             self.nao.motion_record.request(PlayRecording(recording))
-            self.nao.autonomous.request(NaoRestRequest())
         except Exception as e:
             self.logger.error(f"Error replaying motion: {e}")
+
+        # reset NAO after reaction
+
+        self.logger.info("Resetting NAO to wake state (stand) after motion.")
+        try:
+            self.nao.autonomous.request(NaoWakeUpRequest())
+        except Exception as e:
+            self.logger.error(f"Error waking up NAO after motion: {e}")
+        self.emotion = "Surprised" # Since surprised == white 
+        self.display_emotion()
 
     def on_nao_audio(self, message: AudioMessage):
         if self.is_nao_speaking or self.model_is_speaking:
@@ -142,7 +187,7 @@ class NaoGeminiConversation(SICApplication):
             )
 
     async def run_gemini(self):
-        client = genai.Client(api_key="YOUR_API_KEY_HERE")
+        client = genai.Client(api_key="")
         model = "gemini-live-2.5-flash-preview"
 
         start_dance_tool = {
@@ -214,6 +259,49 @@ class NaoGeminiConversation(SICApplication):
                         self.is_nao_speaking = False
 
                 await asyncio.sleep(0.05)
+                
+    def display_emotion(self):
+        """
+        Helper function to announce an emotion and set the LEDs.
+        """
+        if self.shutdown_event.is_set():
+            return
+        
+        emotions = {
+            "Happy": (1.0, 0.6, 0.0, "I am feeling happy!"),        # Gold/Orange
+            "Sad": (0.0, 0.0, 1.0, "I am feeling sad."),            # Blue
+            "Angry": (1.0, 0.0, 0.0, "I am feeling angry!"),        # Red
+            "Surprised": (1.0, 1.0, 1.0, "Oh! I am surprised."),    # White
+            "Love": (1.0, 0.0, 0.5, "I feel so much love."),        # Pink
+            "Calm": (0.0, 1.0, 0.0, "I am feeling calm."),          # Green
+            "Thinking": (0.0, 1.0, 1.0, "Hmm, let me think."),      # Cyan
+            "Confused": (0.5, 0.0, 1.0, "I am a bit confused.")     # Purple
+        }
+
+        self.logger.info(f"Displaying emotion: {self.emotion}")
+
+        r, g, b, _ = emotions[self.emotion]
+        self.nao.leds.request(NaoFadeRGBRequest("FaceLeds", r, g, b, 0.5))
+        self.nao.leds.request(NaoFadeRGBRequest("ChestLeds", r, g, b, 0.5))
+        self.nao.leds.request(NaoFadeRGBRequest("FeetLeds", r, g, b, 0.5))
+
+    def play_audio(self):
+        """Main application logic."""
+        try:
+            self.logger.info("Sending audio!")
+            sound = self.wavefile.readframes(self.wavefile.getnframes())
+            message = AudioRequest(sample_rate=self.samplerate, waveform=sound)
+            self.nao.speaker.request(message)
+
+            self.logger.info("Audio sent, without waiting for it to complete playing.")
+            self.logger.info("Speakers demo completed successfully")
+        except Exception as e:
+            self.logger.error("Error in speakers demo: {}".format(e=e))
+        finally:
+            if self.wavefile:
+                self.wavefile.close()
+            self.logger.info("Shutting down application")
+            self.shutdown()
 
     def run(self):
         self.logger.info("Starting NAO Gemini Conversation Demo with tools.")
@@ -222,6 +310,15 @@ class NaoGeminiConversation(SICApplication):
             asyncio.run(self.run_gemini())
         except Exception as e:
             self.logger.error(f"Error: {e}")
+        finally:
+            self.shutdown()
+
+        try: 
+            self.nao.leds.request(NaoLEDRequest("FaceLeds", True))
+            self.nao.leds.request(NaoLEDRequest("ChestLeds", True))
+            self.nao.leds.request(NaoLEDRequest("FeetLeds", True))
+        except Exception as e:
+            self.logger.error(f"Error in LED Emotions Demo: {e}")
         finally:
             self.shutdown()
 
