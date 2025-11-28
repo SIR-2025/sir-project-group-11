@@ -261,9 +261,9 @@ class NaoGeminiConversation(SICApplication):
     async def set_tracking_state(self, tracking_enabled: bool):
         self.logger.info(f"Setting tracking state to: {tracking_enabled}")
         if tracking_enabled:
-            # Disable idle behaviors
+            # Disable Basic Awareness (looking at people) but KEEP Background Moving (breathing)
             self.nao.autonomous.request(NaoBasicAwarenessRequest(False))
-            self.nao.autonomous.request(NaoBackgroundMovingRequest(False))
+            self.nao.autonomous.request(NaoBackgroundMovingRequest(True))
 
             # Start tracking RedBall
             # mode="Head" tracks with head only.
@@ -271,8 +271,7 @@ class NaoGeminiConversation(SICApplication):
             self.nao.tracker.request(
                 StartTrackRequest(target_name="RedBall", size=0.06, mode="Head")
             )
-        else:
-            # Stop tracking
+        else:  # Stop tracking
             self.logger.info("Stopping tracking...")
             self.nao.tracker.request(StopAllTrackRequest())
 
