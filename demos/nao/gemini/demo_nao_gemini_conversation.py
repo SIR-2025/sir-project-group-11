@@ -53,7 +53,7 @@ class NaoGeminiConversation(SICApplication):
             "demos/nao/positive_reactions/motion_clapping",
             "demos/nao/positive_reactions/motion_mwak",
             "demos/nao/positive_reactions/motion_yay",
-            "demos/nao/positive_reactions/motion_yeah",
+            "demos/nao/positive_reactions/motion_head_tilt",
         ]
 
         self.motion_chains = {
@@ -170,7 +170,7 @@ class NaoGeminiConversation(SICApplication):
                 "HeadYaw",
                 "HeadPitch",
             ],
-            "demos/nao/positive_reactions/motion_yeah": ["HeadYaw", "HeadPitch"],
+            "demos/nao/positive_reactions/motion_head_tilt": ["HeadYaw", "HeadPitch"],
         }
 
         self.motion_name = None
@@ -354,7 +354,7 @@ class NaoGeminiConversation(SICApplication):
                             "motion_clapping",
                             "motion_mwak",
                             "motion_yay",
-                            "motion_yeah",
+                            "motion_head_tilt",
                         ],
                     },
                 },
@@ -396,7 +396,7 @@ CRITICAL: You have access to tools to control your physical behavior.
     - `motion_clapping`: For good plays/goals/jokes.
     - `motion_mwak`: "Chef's kiss" for beautiful plays.
     - `motion_yay`: For celebrations/winning.
-    - `motion_yeah`: For agreement/nod.
+    - `motion_head_tilt`: For agreement/nod.
 
 2. **Tracking (`set_tracking_state`)**: Use this to control whether you are watching the ball.
     - Call `set_tracking_state(enabled=True)` IMMEDIATELY when you hear the match has started (kick-off).
