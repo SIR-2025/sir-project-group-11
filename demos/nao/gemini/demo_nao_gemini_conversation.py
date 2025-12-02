@@ -11,6 +11,8 @@ from sic_framework.core.message_python2 import AudioMessage
 from sic_framework.devices.common_naoqi.naoqi_autonomous import (
     NaoRestRequest,
     NaoWakeUpRequest,
+    NaoBasicAwarenessRequest,
+    NaoBackgroundMovingRequest,
 )
 from sic_framework.devices.common_naoqi.naoqi_motion_recorder import (
     NaoqiMotionRecorderConf,
@@ -19,6 +21,10 @@ from sic_framework.devices.common_naoqi.naoqi_motion_recorder import (
 )
 from sic_framework.devices.common_naoqi.naoqi_motion import NaoPostureRequest
 from sic_framework.devices.common_naoqi.naoqi_stiffness import Stiffness
+from sic_framework.devices.common_naoqi.naoqi_tracker import (
+    StartTrackRequest,
+    StopAllTrackRequest,
+)
 import random
 
 
@@ -186,6 +192,8 @@ class NaoGeminiConversation(SICApplication):
         conf = NaoqiMotionRecorderConf(use_sensors=True)
         self.nao = Nao(ip=self.nao_ip, motion_record_conf=conf)
         self.nao.autonomous.request(NaoWakeUpRequest())
+        self.nao.autonomous.request(NaoBasicAwarenessRequest(True))
+        self.nao.autonomous.request(NaoBackgroundMovingRequest(True))
 
     # -------------------------------------------------------------------------
     # NAO-side actions
@@ -250,6 +258,28 @@ class NaoGeminiConversation(SICApplication):
             )
             asyncio.run_coroutine_threadsafe(coro, self.loop)
 
+    async def set_tracking_state(self, tracking_enabled: bool):
+        self.logger.info(f"Setting tracking state to: {tracking_enabled}")
+        if tracking_enabled:
+            # Disable Basic Awareness (looking at people) but KEEP Background Moving (breathing)
+            self.nao.autonomous.request(NaoBasicAwarenessRequest(False))
+            self.nao.autonomous.request(NaoBackgroundMovingRequest(True))
+
+            # Start tracking RedBall
+            # mode="Head" tracks with head only.
+            self.logger.info("Starting RedBall tracking (Head only)...")
+            self.nao.tracker.request(
+                StartTrackRequest(target_name="RedBall", size=0.06, mode="Head")
+            )
+        else:  # Stop tracking
+            self.logger.info("Stopping tracking...")
+            self.nao.tracker.request(StopAllTrackRequest())
+
+            # Re-enable idle behaviors
+            self.logger.info("Re-enabling Basic Awareness and Background Moving...")
+            self.nao.autonomous.request(NaoBasicAwarenessRequest(True))
+            self.nao.autonomous.request(NaoBackgroundMovingRequest(True))
+
     # -------------------------------------------------------------------------
     # Tool-call handling
     # -------------------------------------------------------------------------
@@ -283,11 +313,21 @@ class NaoGeminiConversation(SICApplication):
                         response={"result": "ok", "type": type},
                     )
                 )
+            elif name == "set_tracking_state":
+                enabled = args.get("enabled")
+                await self.set_tracking_state(enabled)
+                function_responses.append(
+                    types.FunctionResponse(
+                        id=call_id,
+                        name=name,
+                        response={"result": "ok", "enabled": enabled},
+                    )
+                )
 
-        if function_responses:
-            await self.gemini_session.send_tool_response(
-                function_responses=function_responses
-            )
+        # if function_responses:
+        #     await self.gemini_session.send_tool_response(
+        #         function_responses=function_responses
+        #     )
 
     # -------------------------------------------------------------------------
     # Gemini Live main loop
@@ -323,24 +363,44 @@ class NaoGeminiConversation(SICApplication):
             "behavior": "NON_BLOCKING",
         }
 
+        # Define the tracking tool
+        set_tracking_state = {
+            "name": "set_tracking_state",
+            "description": "Enable or disable ball tracking mode. When enabled, the robot tracks the ball. When disabled, it uses idle behavior.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "True to enable ball tracking (during the match), False to disable (halftime/end).",
+                    },
+                },
+                "required": ["enabled"],
+            },
+            "behavior": "NON_BLOCKING",
+        }
+
         system_instruction = """You are Nao, a football co-commentator alongside another human commentator called Marcus. You together with the human provide a lively and engaging commentary on a football match happening in front of you.
 
 Your goal is to be extremely expressive and emotional, reacting viscerally to the match events described by Marcus. You do not simply talk; you embody the excitement and despair of a fan.
 
 Keep your verbal comments short (one sentence maximum), punchy, and relevant. Build on top of Marcus's commentary. Since you don't know the match details independently, rely on Marcus's cues. Do not invent specific events like passes or goals unless Marcus mentions them.
 
-CRITICAL: You MUST use the `show_expression` tool frequently to display your physical reactions. Do not just say you are excited or disappointed; SHOW it.
+CRITICAL: You have access to tools to control your physical behavior.
 
-Here is a guide on when to use each available expression:
+1. **Expressions (`show_expression`)**: Use this tool FREQUENTLY to display your emotional reactions.
+    - `motion_stupidx3`: For mistakes/fouls. "I can't believe that."
+    - `motion_no_no_no`: For disagreement/denial. "No way!"
+    - `motion_oh_man`: For near misses/frustration. "So close!"
+    - `motion_desperation_and_disappointment`: For conceding a goal/major defeat.
+    - `motion_clapping`: For good plays/goals/jokes.
+    - `motion_mwak`: "Chef's kiss" for beautiful plays.
+    - `motion_yay`: For celebrations/winning.
+    - `motion_yeah`: For agreement/nod.
 
-- `motion_stupidx3`: Use this when a player makes a bafflingly stupid mistake, a foul is committed, or the referee makes a terrible call. It signifies "I can't believe how dumb that was."
-- `motion_no_no_no`: Use this to express strong disagreement, disbelief at a missed opportunity, or denial that a goal was conceded. "No way, that didn't just happen."
-- `motion_oh_man`: Use this for "so close!" moments, near misses, or general frustration. "Oh man, that was unlucky."
-- `motion_desperation_and_disappointment`: Use this for major setbacks, conceding a goal, or when the team is playing terribly. It is a full-body slump of defeat.
-- `motion_clapping`: Use this to applaud a good pass, a nice save, a goal, or a funny joke by Marcus.
-- `motion_mwak`: This is a "chef's kiss" or blowing a kiss. Use it for a beautiful play, a perfect shot, or sarcastically when something is "beautifully terrible."
-- `motion_yay`: Use this for high excitement, celebrations, goals, or winning moments. Hands go up in victory!
-- `motion_yeah`: A subtle nod or fist pump. Use it for agreement with Marcus, confirmation of a good point, or mild satisfaction.
+2. **Tracking (`set_tracking_state`)**: Use this to control whether you are watching the ball.
+    - Call `set_tracking_state(enabled=True)` IMMEDIATELY when you hear the match has started (kick-off).
+    - Call `set_tracking_state(enabled=False)` when the match stops (halftime whistle or final whistle).
 
 Always try to match your expressions to the tone of your commentary. Be lively, be animated, and be the best robot commentator in the world!"""
 
@@ -348,7 +408,7 @@ Always try to match your expressions to the tone of your commentary. Be lively, 
             "response_modalities": ["TEXT"],
             "system_instruction": system_instruction,
             "tools": [
-                {"function_declarations": [show_expression]},
+                {"function_declarations": [show_expression, set_tracking_state]},
             ],
         }
 
