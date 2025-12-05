@@ -14,6 +14,10 @@ from sic_framework.devices.common_naoqi.naoqi_autonomous import (
     NaoBasicAwarenessRequest,
     NaoBackgroundMovingRequest,
 )
+from sic_framework.devices.common_naoqi.naoqi_leds import (
+    NaoFadeRGBRequest,
+    NaoLEDRequest,
+)
 from sic_framework.devices.common_naoqi.naoqi_motion_recorder import (
     NaoqiMotionRecorderConf,
     NaoqiMotionRecording,
@@ -49,14 +53,51 @@ class NaoGeminiConversation(SICApplication):
             "demos/nao/negative_reactions/motion_oh_man",
             "demos/nao/negative_reactions/motion_desperation_and_disappointment",
         ]
+        self.neutral_reactions = [
+            "demos/nao/neutral_reactions/motion_present_left_team",
+            "demos/nao/neutral_reactions/motion_present_right_team",
+        ]
         self.positive_reactions = [
             "demos/nao/positive_reactions/motion_clapping",
             "demos/nao/positive_reactions/motion_mwak",
-            "demos/nao/positive_reactions/motion_yay",
             "demos/nao/positive_reactions/motion_head_tilt",
         ]
 
         self.motion_chains = {
+            "demos/nao/negative_reactions/motion_cover_eyes": [
+                "LShoulderPitch",
+                "LShoulderRoll",
+                "LElbowYaw",
+                "LElbowRoll",
+                "LWristYaw",
+                "LHand",
+                "RShoulderPitch",
+                "RShoulderRoll",
+                "RElbowRoll",
+                "RElbowYaw",
+                "RWristYaw",
+                "RHand",
+            ],
+            "demos/nao/neutral_reactions/motion_present_left_team": [
+                "LShoulderPitch",
+                "LShoulderRoll",
+                "LElbowYaw",
+                "LElbowRoll",
+                "LWristYaw",
+                "LHand",
+                "HeadYaw",
+                "HeadPitch",
+            ],
+            "demos/nao/neutral_reactions/motion_present_right_team": [
+                "RShoulderPitch",
+                "RShoulderRoll",
+                "RElbowRoll",
+                "RElbowYaw",
+                "RWristYaw",
+                "RHand",
+                "HeadYaw",
+                "HeadPitch",
+            ],
             "demos/nao/negative_reactions/motion_stupidx3": [
                 "LShoulderPitch",
                 "LShoulderRoll",
@@ -150,7 +191,8 @@ class NaoGeminiConversation(SICApplication):
                 "HeadYaw",
                 "HeadPitch",
             ],
-            "demos/nao/positive_reactions/motion_yay": [
+            "demos/nao/positive_reactions/motion_head_tilt": ["HeadYaw", "HeadPitch"],
+            "demos/nao/positive_reactions/motion_handsup_excited": [
                 "RKneePitch",
                 "LKneePitch",
                 "RAnklePitch",
@@ -170,7 +212,6 @@ class NaoGeminiConversation(SICApplication):
                 "HeadYaw",
                 "HeadPitch",
             ],
-            "demos/nao/positive_reactions/motion_head_tilt": ["HeadYaw", "HeadPitch"],
         }
 
         self.motion_name = None
@@ -195,6 +236,38 @@ class NaoGeminiConversation(SICApplication):
         self.nao.autonomous.request(NaoBasicAwarenessRequest(True))
         self.nao.autonomous.request(NaoBackgroundMovingRequest(True))
 
+    async def _continuous_blink(
+        self,
+        r: float,
+        g: float,
+        b: float,
+        min_interval: float = 1.5,
+        max_interval: float = 7.0,
+    ):
+        """
+        Continuously blinks the NAO's eye LEDs with random durations and intervals.
+        Args:
+            r, g, b (float): RGB values for the eyes when on (0.0 to 1.0).
+            min_blink_duration (float): Minimum duration for the 'off' state of the blink in seconds.
+            max_blink_duration (float): Maximum duration for the 'off' state of the blink in seconds.
+            min_interval (float): Minimum time between the start of one 'eyes on' phase and the next.
+            max_interval (float): Maximum time between the start of one 'eyes on' phase and the next.
+        """
+        self.logger.info("Starting continuous eye blinking with random durations.")
+        try:
+            while not self.shutdown_event.is_set():
+                interval = random.uniform(min_interval, max_interval)
+
+                # Eyes on
+                self.nao.leds.request(NaoFadeRGBRequest("FaceLeds", r, g, b, 0.2))
+                await asyncio.sleep(interval)
+
+                # Eyes off (black)
+                self.nao.leds.request(NaoFadeRGBRequest("FaceLeds", 0.0, 0.0, 0.0))
+                # await asyncio.sleep(blink_duration)
+        except Exception as e:
+            self.logger.error(f"Error in continuous blinking task: {e}")
+
     # -------------------------------------------------------------------------
     # NAO-side actions
     # -------------------------------------------------------------------------
@@ -209,6 +282,7 @@ class NaoGeminiConversation(SICApplication):
         full_path = next(
             (key for key in self.motion_chains if key.endswith(f"/{type}")), None
         )
+        self.logger.info(f"Resolved motion full path: {full_path}")
 
         if full_path:
             self.motion_name = full_path
@@ -353,8 +427,11 @@ class NaoGeminiConversation(SICApplication):
                             "motion_desperation_and_disappointment",
                             "motion_clapping",
                             "motion_mwak",
-                            "motion_yay",
                             "motion_head_tilt",
+                            "motion_cover_eyes",
+                            "motion_present_left_team",
+                            "motion_present_right_team",
+                            "motion_handsup_excited",
                         ],
                     },
                 },
@@ -380,11 +457,11 @@ class NaoGeminiConversation(SICApplication):
             "behavior": "NON_BLOCKING",
         }
 
-        system_instruction = """You are Nao, a football co-commentator alongside another human commentator called Marcus. You together with the human provide a lively and engaging commentary on a football match happening in front of you.
+        system_instruction = """You are Nao, a football co-commentator alongside another human commentator. You together with the human provide a lively and engaging commentary on a football match happening in front of you.
 
-Your goal is to be extremely expressive and emotional, reacting viscerally to the match events described by Marcus. You do not simply talk; you embody the excitement and despair of a fan.
+Your goal is to be extremely expressive and emotional, reacting viscerally to the match events described by the co-commentator. You do not simply talk; you embody the excitement and despair of a fan.
 
-Keep your verbal comments short (one sentence maximum), punchy, and relevant. Build on top of Marcus's commentary. Since you don't know the match details independently, rely on Marcus's cues. Do not invent specific events like passes or goals unless Marcus mentions them.
+Keep your verbal comments short (one sentence maximum), punchy, and relevant. Build on top of your co-commentator's commentary. Since you don't know the match details independently, rely on your co-commentator's cues. Do not invent specific events like passes or goals unless your co-commentator mentions them.
 
 CRITICAL: You have access to tools to control your physical behavior.
 
@@ -395,14 +472,19 @@ CRITICAL: You have access to tools to control your physical behavior.
     - `motion_desperation_and_disappointment`: For conceding a goal/major defeat.
     - `motion_clapping`: For good plays/goals/jokes.
     - `motion_mwak`: "Chef's kiss" for beautiful plays.
-    - `motion_yay`: For celebrations/winning.
+    - `motion_handsup_excited`: For celebrating a goal.
     - `motion_head_tilt`: For agreement/nod.
+    - `motion_cover_eyes`: For a terrible horrific event such as an own goal or painful injury.
+    - `motion_present_left_team`: For introducing the left team.
+    - `motion_present_right_team`: For introducing the right team.
 
 2. **Tracking (`set_tracking_state`)**: Use this to control whether you are watching the ball.
     - Call `set_tracking_state(enabled=True)` IMMEDIATELY when you hear the match has started (kick-off).
     - Call `set_tracking_state(enabled=False)` when the match stops (halftime whistle or final whistle).
 
-Always try to match your expressions to the tone of your commentary. Be lively, be animated, and be the best robot commentator in the world!"""
+Always try to match your expressions to the tone of your commentary. Be lively, be animated, and be the best robot commentator in the world!
+
+When you are asked to introduce the teams, first start with introducing the Netherlands on the left hand side together with a 'motion_present_left_team' expression tool call, then introduce Romania team on the right hand side with a "motion_present_right_team" expression tool call. Make sure when the co-commentator says to introduce the left team, you say to "your" left as in the audience's left you face opposite (so do not say my right etc).You must call these tools when introducting the teams. These are separate introductions separated by the co-commentator's addition after you introduce the Netherlands first. Do not introduce yourself; wait for the co-commentator to prompt you."""
 
         config = {
             "response_modalities": ["TEXT"],
@@ -432,11 +514,6 @@ Always try to match your expressions to the tone of your commentary. Be lively, 
                     # 1. MODEL STARTS SPEAKING (first chunk of TEXT)
                     # ------------------------------------------------------
                     if response.text is not None:
-                        if not self.model_is_speaking:
-                            self.model_is_speaking = True
-                            self.is_nao_speaking = True
-                            self.logger.info("Model started responding; mic muted.")
-
                         self.buffered_text.append(response.text)
 
                     # ------------------------------------------------------
@@ -448,6 +525,9 @@ Always try to match your expressions to the tone of your commentary. Be lively, 
 
                         if full_text:
                             self.logger.info(f"Full model response: {full_text}")
+                            self.model_is_speaking = True
+                            self.is_nao_speaking = True
+                            self.logger.info("Model started responding; mic muted.")
                             # Speak on NAO
                             self.nao.tts.request(
                                 NaoqiTextToSpeechRequest(full_text),
@@ -467,12 +547,35 @@ Always try to match your expressions to the tone of your commentary. Be lively, 
         self.logger.info("Starting NAO Gemini Conversation Demo with tools.")
 
         try:
-            asyncio.run(self.run_gemini())
+            # Ensure FaceLeds are enabled before starting to blink
+            self.nao.leds.request(NaoLEDRequest("FaceLeds", True))
+
+            # Create the event loop and run tasks concurrently
+            loop = asyncio.get_event_loop()
+            blinking_task = loop.create_task(
+                self._continuous_blink(
+                    r=1.0,
+                    g=1.0,
+                    b=1.0,
+                )
+            )  # White blinking, fixed short blink, random interval
+            gemini_task = loop.create_task(self.run_gemini())
+
+            loop.run_until_complete(asyncio.gather(blinking_task, gemini_task))
+
         except Exception as e:
             self.logger.error(f"Error: {e}")
         finally:
+            # Cancel all tasks when the main application shuts down
+            tasks = asyncio.all_tasks(loop=self.loop)
+            for task in tasks:
+                task.cancel()
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            self.logger.info("All asyncio tasks cancelled.")
+
             self.shutdown()
 
 
 if __name__ == "__main__":
+    print("Starting NAO Gemini Conversation Demo...")
     NaoGeminiConversation().run()
