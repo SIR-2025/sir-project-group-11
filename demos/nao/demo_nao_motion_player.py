@@ -31,13 +31,13 @@ class NaoMotionRecorderDemo(SICApplication):
         super(NaoMotionRecorderDemo, self).__init__()
         
         # Demo-specific initialization
-        self.nao_ip = "10.0.0.243"
+        self.nao_ip = "10.0.0.241"
 
-        self.negative_reactions = ["negative_reactions/motion_stupidx3", "negative_reactions/motion_no_no_no", "negative_reactions/motion_oh_man", "negative_reactions/motion_desperation_and_disappointment"]
-        self.positive_reactions = ["positive_reactions/motion_clapping", "positive_reactions/motion_mwak", "positive_reactions/motion_yay", "positive_reactions/motion_yay"]
-        self.all_reactions = self.negative_reactions + self.positive_reactions
+        # self.negative_reactions = ["negative_reactions/motion_stupidx3", "negative_reactions/motion_no_no_no", "negative_reactions/motion_oh_man", "negative_reactions/motion_desperation_and_disappointment"]
+        # self.positive_reactions = ["positive_reactions/motion_clapping", "positive_reactions/motion_mwak", "positive_reactions/motion_yay", "positive_reactions/motion_yay"]
+        # self.all_reactions = self.negative_reactions + self.positive_reactions
         
-        self.motion_name = None
+        self.motion_name = "yay_alt2"
 
         self.chain = None        
         self.nao = None
@@ -71,11 +71,13 @@ class NaoMotionRecorderDemo(SICApplication):
                             "positive_reactions/motion_clapping":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
                             "positive_reactions/motion_mwak":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
                             "positive_reactions/motion_yay":['RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowRoll', 'RElbowYaw', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
-                            "positive_reactions/motion_yeah":['HeadYaw', 'HeadPitch']}
+                            "positive_reactions/motion_yeah":['HeadYaw', 'HeadPitch'],
+                            "positive_reactions/motion_handsup_excited":['RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowRoll', 'RElbowYaw', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
+                            "neutral_reactions/motion_present_left_team":['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'HeadYaw', 'HeadPitch'],
+                            "neutral_reactions/motion_present_right_team":['RShoulderPitch', 'RShoulderRoll', 'RElbowRoll', 'RElbowYaw', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],}
             
-            self.motion_name = random.choice(self.all_reactions)
+            # self.motion_name = random.choice(self.all_reactions)
             self.chain = motion_chains[self.motion_name]
-
             self.logger.info("Replaying action")
             self.nao.stiffness.request(
                 Stiffness(stiffness=0.7, joints=self.chain)

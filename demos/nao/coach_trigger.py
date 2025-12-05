@@ -29,13 +29,13 @@ class NaoGeminiConversation(SICApplication):
     
     def __init__(self):
         super(NaoGeminiConversation, self).__init__()
-
+        
         self.nao_ip = "10.0.0.243"
 
         self.negative_reactions = ["negative_reactions/motion_stupidx3", "negative_reactions/motion_no_no_no", "negative_reactions/motion_oh_man", "negative_reactions/motion_desperation_and_disappointment"]
         self.positive_reactions = ["positive_reactions/motion_clapping", "positive_reactions/motion_mwak", "positive_reactions/motion_yay", "positive_reactions/motion_yeah"]
         
-        self.audio_file = None
+        self.audio_file = 'test_sound.wav'  # Default audio file
 
         self.motion_name = None
         self.chain = None
@@ -55,18 +55,7 @@ class NaoGeminiConversation(SICApplication):
 
     def setup(self):
         self.logger.info("Initializing NAO...")
-        
-        # Read the wav file
-        self.wavefile = wave.open(self.audio_file, "rb")
-        self.samplerate = self.wavefile.getframerate()
-        
-        self.logger.info("Audio file specs:")
-        self.logger.info("  sample rate: {}".format(self.wavefile.getframerate()))
-        self.logger.info("  length: {}".format(self.wavefile.getnframes()))
-        self.logger.info("  data size in bytes: {}".format(self.wavefile.getsampwidth()))
-        self.logger.info("  number of channels: {}".format(self.wavefile.getnchannels()))
-        self.logger.info("")
-
+                
         conf = NaoqiMotionRecorderConf(use_sensors=True)
         self.nao = Nao(ip=self.nao_ip, motion_record_conf=conf)
 
@@ -85,8 +74,8 @@ class NaoGeminiConversation(SICApplication):
                          "positive_reactions/motion_yay":['RKneePitch', 'LKneePitch', 'RAnklePitch', 'LAnklePitch', 'LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowRoll', 'RElbowYaw', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch'],
                          "positive_reactions/motion_yeah":['HeadYaw', 'HeadPitch']}
 
-        reaction_and_audio_pair = {"positive_reactions/motion_clapping": "sound_effects/applause.wav",
-                                   "positive_reactions/motion_mwak": "sound_effects/kiss.wav",}
+        reaction_and_audio_pair = {"positive_reactions/motion_clapping": "/Users/achiot/Desktop/SIR/sir-project-group-11/demos/nao/sound_effects/applause.wav",
+                                   "positive_reactions/motion_mwak": "/Users/achiot/Desktop/SIR/sir-project-group-11/demos/nao/sound_effects/kiss.wav",}
 
         if style == "coach": # TODO: change to negative word to trigger negative reactions
             self.logger.info(f"Trigger {style} detected! Replaying specific recording...")
@@ -97,6 +86,9 @@ class NaoGeminiConversation(SICApplication):
             # change LEDs to red color to indicate negative reaction    
             self.emotion = "Angry"  # Angry emotion
             self.display_emotion()
+            if self.motion_name in reaction_and_audio_pair:
+                self.audio_file = reaction_and_audio_pair[self.motion_name]
+                await asyncio.to_thread(self.play_audio)
             # replay emotion
             await asyncio.to_thread(self._execute_replay_logic)
             # NOTE: we still need nao to speak while doing the motion. 
@@ -104,15 +96,25 @@ class NaoGeminiConversation(SICApplication):
         elif style == "good": 
             self.logger.info(f"Trigger {style} detected! Replaying specific recording...")
             # Randomly select a positive reaction motion 
-            self.motion_name = random.choice(self.positive_reactions)
+            # self.motion_name = random.choice(self.positive_reactions)
+            self.motion_name = "positive_reactions/motion_clapping"
             self.chain = motion_chains[self.motion_name]
 
             # change LEDs to gold/orange color to indicate positive reaction    
             self.emotion = "Happy" # Happy emotion
             self.display_emotion()
-            # replay emotion
-            await asyncio.to_thread(self._execute_replay_logic)
-            # NOTE: we still need nao to speak while doing the motion. 
+
+            # replay emotion + audio if available
+            if self.motion_name in reaction_and_audio_pair:
+                self.logger.info("Starting concurrent audio playback and motion replay.")
+                # self.audio_file = reaction_and_audio_pair[self.motion_name]
+                await asyncio.gather(
+                    asyncio.to_thread(self.play_audio),
+                    asyncio.to_thread(self._execute_replay_logic)
+                )
+            else: 
+                self.logger.info("No audio file associated with this motion; only replaying motion.")
+                await asyncio.to_thread(self._execute_replay_logic)
             
         else:
             self.logger.info("Standard dance requested.")
@@ -187,7 +189,7 @@ class NaoGeminiConversation(SICApplication):
             )
 
     async def run_gemini(self):
-        client = genai.Client(api_key="")
+        client = genai.Client(api_key="AIzaSyDMC5xGiIN-9aGHXouWHWC-Ht8x5Qobzu4")
         model = "gemini-live-2.5-flash-preview"
 
         start_dance_tool = {
@@ -285,8 +287,12 @@ class NaoGeminiConversation(SICApplication):
         self.nao.leds.request(NaoFadeRGBRequest("ChestLeds", r, g, b, 0.5))
         self.nao.leds.request(NaoFadeRGBRequest("FeetLeds", r, g, b, 0.5))
 
-    def play_audio(self):
-        """Main application logic."""
+    async def play_audio(self):
+        # Read the wav file
+        self.logger.info(f"Reading audio wav file: {self.audio_file}")
+        self.wavefile = wave.open(self.audio_file, "rb")
+        self.samplerate = self.wavefile.getframerate()
+
         try:
             self.logger.info("Sending audio!")
             sound = self.wavefile.readframes(self.wavefile.getnframes())
