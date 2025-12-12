@@ -283,7 +283,7 @@ class NaoGeminiConversation(SICApplication):
         self.vad = SimpleEnergyVAD(VADConfig(sample_rate=16000))
         self._vad_lock = asyncio.Lock()
 
-        self.client = genai.Client(api_key="AIzaSyAvfE2eOPfvrLLQqiltFi-ne3s0XlltTQs")
+        self.client = genai.Client()
         self.model = "gemini-2.5-flash"  # fast text model
 
         # Chat/session state for the text model
@@ -355,13 +355,13 @@ class NaoGeminiConversation(SICApplication):
         if not full_path:
             self.logger.error(f"Motion {type} not found.")
             return
-        
-        if "positive" in full_path: 
-            self.emotion="Happy"
+
+        if "positive" in full_path:
+            self.emotion = "Happy"
         elif "negative" in full_path:
-            self.emotion="Angry"
+            self.emotion = "Angry"
         else:
-            self.emotion="Calm"
+            self.emotion = "Calm"
 
         self.display_emotion()
 
@@ -370,7 +370,7 @@ class NaoGeminiConversation(SICApplication):
             asyncio.to_thread(self._execute_replay_logic, full_path, chain)
         )
 
-        self.emotion="Calm"
+        self.emotion = "Calm"
         self.display_emotion()
 
     def _execute_replay_logic(self, motion_name, chain):
@@ -389,11 +389,11 @@ class NaoGeminiConversation(SICApplication):
         """
         if self.shutdown_event.is_set():
             return
-        
+
         emotions = {
-            "Happy": (0.0, 1.0, 0.0, "I am feeling happy!"),        # Green
-            "Angry": (1.0, 0.0, 0.0, "I am feeling angry!"),        # Red
-            "Calm": (1.0, 1.0, 1.0, "I am feeling calm."),          # White
+            "Happy": (0.0, 1.0, 0.0, "I am feeling happy!"),  # Green
+            "Angry": (1.0, 0.0, 0.0, "I am feeling angry!"),  # Red
+            "Calm": (1.0, 1.0, 1.0, "I am feeling calm."),  # White
         }
 
         self.logger.info(f"Displaying emotion: {self.emotion}")
@@ -609,7 +609,7 @@ class NaoGeminiConversation(SICApplication):
             3) When Sof announces kick-off, you enable tracking.
             4) During the match, react to Sof's commentary with short remarks and frequent use of the expression tool.
             5) At the end of the match, when Sof announces the final whistle, you disable tracking.
-            6) You then enter a post-match analysis phase, providing your thoughts on the game with appropriate expressions after you have been prompted by Sof.
+            6) You then enter a post-match analysis phase, providing your thoughts on the game with appropriate expressions after you have been prompted by the interviewer Asha.
 
             Never call the expression tool multiple times in a row without any verbal commentary in between. Always say something before using the expression tool again.
             
