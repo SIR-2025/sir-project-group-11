@@ -333,7 +333,7 @@ class NaoGeminiConversation(SICApplication):
             return
         
         emotions = {
-            "Happy": (0.0, 1.0, 0.0, "I am feeling happy!"),        # Gold/Orange
+            "Happy": (0.0, 1.0, 0.0, "I am feeling happy!"),        # Green
             "Angry": (1.0, 0.0, 0.0, "I am feeling angry!"),        # Red
             "Calm": (1.0, 1.0, 1.0, "I am feeling calm."),          # White
         }
