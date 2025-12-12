@@ -276,12 +276,14 @@ class NaoGeminiConversation(SICApplication):
         self.is_nao_speaking = False
         self.model_is_busy = False
 
+        self.emotion = None
+
         self.pending_expression = None
 
         self.vad = SimpleEnergyVAD(VADConfig(sample_rate=16000))
         self._vad_lock = asyncio.Lock()
 
-        self.client = genai.Client()
+        self.client = genai.Client(api_key="AIzaSyAvfE2eOPfvrLLQqiltFi-ne3s0XlltTQs")
         self.model = "gemini-2.5-flash"  # fast text model
 
         # Chat/session state for the text model
@@ -353,11 +355,23 @@ class NaoGeminiConversation(SICApplication):
         if not full_path:
             self.logger.error(f"Motion {type} not found.")
             return
+        
+        if "positive" in full_path: 
+            self.emotion="Happy"
+        elif "negative" in full_path:
+            self.emotion="Angry"
+        else:
+            self.emotion="Calm"
+
+        self.display_emotion()
 
         chain = self.motion_chains[full_path]
         asyncio.create_task(
             asyncio.to_thread(self._execute_replay_logic, full_path, chain)
         )
+
+        self.emotion="Calm"
+        self.display_emotion()
 
     def _execute_replay_logic(self, motion_name, chain):
         try:
@@ -368,6 +382,25 @@ class NaoGeminiConversation(SICApplication):
             self.nao.motion.request(NaoPostureRequest("Stand", 0.5), block=False)
         except Exception as e:
             self.logger.error(f"Error replaying motion: {e}")
+
+    def display_emotion(self):
+        """
+        Helper function to announce an emotion and set the LEDs.
+        """
+        if self.shutdown_event.is_set():
+            return
+        
+        emotions = {
+            "Happy": (0.0, 1.0, 0.0, "I am feeling happy!"),        # Green
+            "Angry": (1.0, 0.0, 0.0, "I am feeling angry!"),        # Red
+            "Calm": (1.0, 1.0, 1.0, "I am feeling calm."),          # White
+        }
+
+        self.logger.info(f"Displaying emotion: {self.emotion}")
+
+        r, g, b, _ = emotions[self.emotion]
+        self.nao.leds.request(NaoFadeRGBRequest("FaceLeds", r, g, b, 0.5))
+        self.nao.leds.request(NaoFadeRGBRequest("ChestLeds", r, g, b, 0.5))
 
     async def _nao_say(self, text: str):
         if not text.strip():
