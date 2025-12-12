@@ -1,4 +1,5 @@
 import asyncio
+from email import message
 from google import genai
 from google.genai import types
 from sic_framework.devices.nao import NaoqiTextToSpeechRequest
@@ -29,7 +30,10 @@ from sic_framework.devices.common_naoqi.naoqi_tracker import (
     StartTrackRequest,
     StopAllTrackRequest,
 )
+from sic_framework.core.message_python2 import AudioRequest
+
 import random
+import audioop
 
 
 class NaoGeminiConversation(SICApplication):
@@ -192,26 +196,26 @@ class NaoGeminiConversation(SICApplication):
                 "HeadPitch",
             ],
             "demos/nao/positive_reactions/motion_head_tilt": ["HeadYaw", "HeadPitch"],
-            "demos/nao/positive_reactions/motion_handsup_excited": [
-                "RKneePitch",
-                "LKneePitch",
-                "RAnklePitch",
-                "LAnklePitch",
-                "LShoulderPitch",
-                "LShoulderRoll",
-                "LElbowYaw",
-                "LElbowRoll",
-                "LWristYaw",
-                "LHand",
-                "RShoulderPitch",
-                "RShoulderRoll",
-                "RElbowRoll",
-                "RElbowYaw",
-                "RWristYaw",
-                "RHand",
-                "HeadYaw",
-                "HeadPitch",
-            ],
+            # "demos/nao/positive_reactions/motion_handsup_excited": [
+            #     "RKneePitch",
+            #     "LKneePitch",
+            #     "RAnklePitch",
+            #     "LAnklePitch",
+            #     "LShoulderPitch",
+            #     "LShoulderRoll",
+            #     "LElbowYaw",
+            #     "LElbowRoll",
+            #     "LWristYaw",
+            #     "LHand",
+            #     "RShoulderPitch",
+            #     "RShoulderRoll",
+            #     "RElbowRoll",
+            #     "RElbowYaw",
+            #     "RWristYaw",
+            #     "RHand",
+            #     "HeadYaw",
+            #     "HeadPitch",
+            # ],
         }
 
         self.motion_name = None
@@ -224,6 +228,16 @@ class NaoGeminiConversation(SICApplication):
         self.is_nao_speaking = False  # blocks mic → model
         self.model_is_speaking = False  # model is generating a response
         self.buffered_text = []  # chunks of TEXT from Live API
+
+        self.resample_state = None
+        self.BATCH_SIZE_THRESHOLD = 24000
+
+        self._TURN_END = object()
+        self.audio_q: asyncio.Queue | None = None
+        self._TURN_END = object()
+        # Coalesce chunks before sending to NAO speaker (file-based)
+        # 24kHz * 2 bytes/sample * 0.25s ≈ 12000 bytes
+        self.MAX_TURN_BYTES_24K = 2_000_000  # ~41.6s @ 48kB/s (tune as desired)
 
         self.set_log_level(sic_logging.INFO)
         self.setup()
@@ -282,8 +296,6 @@ class NaoGeminiConversation(SICApplication):
         full_path = next(
             (key for key in self.motion_chains if key.endswith(f"/{type}")), None
         )
-        self.logger.info(f"Resolved motion full path: {full_path}")
-
         if full_path:
             self.motion_name = full_path
             self.chain = self.motion_chains[full_path]
@@ -296,12 +308,9 @@ class NaoGeminiConversation(SICApplication):
         else:
             self.logger.error(f"Motion {type} not found in motion chains!")
 
-        self.logger.info("NAO expression routine completed.")
-
     def _execute_replay_logic(self, motion_name, chain):
         try:
             self.nao.autonomous.request(NaoWakeUpRequest())
-            self.logger.info("Replaying action (Stiffness -> Load -> Play)")
 
             self.nao.stiffness.request(Stiffness(stiffness=0.7, joints=chain))
 
@@ -403,12 +412,54 @@ class NaoGeminiConversation(SICApplication):
         #         function_responses=function_responses
         #     )
 
+    async def _audio_playback_loop(self):
+        """
+        Plays one aggregated audio blob per model turn.
+        Uses a sentinel (self._TURN_END) to reset resampling state at turn boundaries.
+        """
+        self.logger.info("Starting audio playback loop...")
+        resample_state = None
+
+        while not self.shutdown_event.is_set():
+            try:
+                item = await self.audio_q.get()
+
+                # Turn boundary: reset resampler for next turn
+                if item is self._TURN_END:
+                    resample_state = None
+                    continue
+
+                raw_24k = item
+                if not raw_24k:
+                    continue
+
+                # Resample 24kHz -> 16kHz (mono, 16-bit)
+                raw_16k, resample_state = audioop.ratecv(
+                    raw_24k, 2, 1, 24000, 16000, resample_state
+                )
+
+                message = AudioRequest(sample_rate=16000, waveform=raw_16k)
+
+                self.is_nao_speaking = True
+                try:
+                    # IMPORTANT: speaker.request is blocking; run in a thread
+                    await asyncio.to_thread(self.nao.speaker.request, message)
+                finally:
+                    self.is_nao_speaking = False
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                self.logger.error(f"Error during audio playback: {e}")
+                self.is_nao_speaking = False
+                resample_state = None
+
     # -------------------------------------------------------------------------
     # Gemini Live main loop
     # -------------------------------------------------------------------------
     async def run_gemini(self):
         client = genai.Client()
-        model = "gemini-live-2.5-flash-preview"
+        model = "gemini-2.5-flash-native-audio-preview-09-2025"
 
         # Define the dance tool for the model
         show_expression = {
@@ -431,7 +482,7 @@ class NaoGeminiConversation(SICApplication):
                             "motion_cover_eyes",
                             "motion_present_left_team",
                             "motion_present_right_team",
-                            "motion_handsup_excited",
+                            # "motion_handsup_excited",
                         ],
                     },
                 },
@@ -457,11 +508,11 @@ class NaoGeminiConversation(SICApplication):
             "behavior": "NON_BLOCKING",
         }
 
-        system_instruction = """You are Nao, a football co-commentator alongside another human commentator. You together with the human provide a lively and engaging commentary on a football match happening in front of you.
+        system_instruction = """You are Nao, a football co-commentator alongside another human commentator called Sof. You together with the human provide a lively and engaging commentary on a football match happening in front of you.
 
-Your goal is to be extremely expressive and emotional, reacting viscerally to the match events described by the co-commentator. You do not simply talk; you embody the excitement and despair of a fan.
+Your goal is to be extremely expressive and emotional, reacting viscerally to the match events described by the co-commentator Sof. You do not simply talk; you embody the excitement and despair of a fan.
 
-Keep your verbal comments short (one sentence maximum), punchy, and relevant. Build on top of your co-commentator's commentary. Since you don't know the match details independently, rely on your co-commentator's cues. Do not invent specific events like passes or goals unless your co-commentator mentions them.
+Keep your verbal comments short (one to two sentences maximum), punchy, and relevant. Build on top of your co-commentator's commentary. Since you don't know the match details independently, rely on your co-commentator's cues. Do not invent specific events like passes or goals unless your co-commentator mentions them.
 
 CRITICAL: You have access to tools to control your physical behavior.
 
@@ -472,7 +523,6 @@ CRITICAL: You have access to tools to control your physical behavior.
     - `motion_desperation_and_disappointment`: For conceding a goal/major defeat.
     - `motion_clapping`: For good plays/goals/jokes.
     - `motion_mwak`: "Chef's kiss" for beautiful plays.
-    - `motion_handsup_excited`: For celebrating a goal.
     - `motion_head_tilt`: For agreement/nod.
     - `motion_cover_eyes`: For a terrible horrific event such as an own goal or painful injury.
     - `motion_present_left_team`: For introducing the left team.
@@ -482,12 +532,22 @@ CRITICAL: You have access to tools to control your physical behavior.
     - Call `set_tracking_state(enabled=True)` IMMEDIATELY when you hear the match has started (kick-off).
     - Call `set_tracking_state(enabled=False)` when the match stops (halftime whistle or final whistle).
 
-Always try to match your expressions to the tone of your commentary. Be lively, be animated, and be the best robot commentator in the world!
+Always try to match your expressions to the tone of your commentary. Be lively, be animated, and be the best robot commentator in the world! However, your tone of voice is British English, polite and well-mannered. Speak like a robot though, so quite monotone but with clear articulation.
 
-When you are asked to introduce the teams, first start with introducing the Netherlands on the left hand side together with a 'motion_present_left_team' expression tool call, then introduce Romania team on the right hand side with a "motion_present_right_team" expression tool call. Make sure when the co-commentator says to introduce the left team, you say to "your" left as in the audience's left you face opposite (so do not say my right etc).You must call these tools when introducting the teams. These are separate introductions separated by the co-commentator's addition after you introduce the Netherlands first. Do not introduce yourself; wait for the co-commentator to prompt you."""
+Order of events:
+1) You first introduce yourself
+2) Then, when prompted by Sof, you introduce the two teams using the expression tools. When you are asked to introduce the teams, first start with introducing the Netherlands on the left hand side together with a 'motion_present_left_team' expression tool call, then wait for Sof to prompt to continue. Then introduce Romania team on the right hand side with a "motion_present_right_team" expression tool call. These are separate introductions separated by the co-commentator's addition after you introduce the Netherlands first.
+3) When Sof announces kick-off, you enable tracking.
+4) During the match, react to Sof's commentary with short remarks and frequent use of the expression tool.
+5) At the end of the match, when Sof announces the final whistle, you disable tracking.
+6) You then enter a post-match analysis phase, providing your thoughts on the game with appropriate expressions after you have been prompted by Sof.
+"""
 
         config = {
-            "response_modalities": ["TEXT"],
+            "response_modalities": ["AUDIO"],
+            "speech_config": {
+                "voice_config": {"prebuilt_voice_config": {"voice_name": "Sadachbia"}}
+            },
             "system_instruction": system_instruction,
             "tools": [
                 {"function_declarations": [show_expression, set_tracking_state]},
@@ -498,47 +558,58 @@ When you are asked to introduce the teams, first start with introducing the Neth
             self.gemini_session = session
             self.loop = asyncio.get_running_loop()
 
-            # Start NAO microphone streaming
             self.nao.mic.register_callback(self.on_nao_audio)
             self.logger.info("Microphone callback registered. Start talking!")
 
-            while not self.shutdown_event.is_set():
-                async for response in session.receive():
-                    sc = response.server_content
+            # Queue carries ONE bytes blob per turn + sentinel between turns
+            self.audio_q = asyncio.Queue(maxsize=2)
 
-                    # Handle tool calls (if any)
-                    if response.tool_call:
-                        await self.handle_tool_calls(response)
+            player_task = asyncio.create_task(self._audio_playback_loop())
 
-                    # ------------------------------------------------------
-                    # 1. MODEL STARTS SPEAKING (first chunk of TEXT)
-                    # ------------------------------------------------------
-                    if response.text is not None:
-                        self.buffered_text.append(response.text)
+            # Aggregate model audio per turn (24kHz PCM)
+            turn_buf_24k = bytearray()
 
-                    # ------------------------------------------------------
-                    # 2. MODEL FINISHES ITS TURN (use generation_complete)
-                    # ------------------------------------------------------
-                    if sc and sc.generation_complete:
-                        full_text = "".join(self.buffered_text).strip()
-                        self.buffered_text = []
+            first_turn = False
+            try:
+                while not self.shutdown_event.is_set():
+                    async for response in session.receive():
+                        sc = response.server_content
 
-                        if full_text:
-                            self.logger.info(f"Full model response: {full_text}")
-                            self.model_is_speaking = True
-                            self.is_nao_speaking = True
-                            self.logger.info("Model started responding; mic muted.")
-                            # Speak on NAO
-                            self.nao.tts.request(
-                                NaoqiTextToSpeechRequest(full_text),
-                                block=True,
-                            )
+                        # 1) Tools
+                        if response.tool_call:
+                            await self.handle_tool_calls(response)
 
-                        self.logger.info("NAO finished speaking; mic unmuted.")
-                        self.model_is_speaking = False
-                        self.is_nao_speaking = False
+                        # 2) Collect audio into per-turn accumulator
+                        if sc and sc.model_turn:
+                            if not first_turn:
+                                self.logger.info("First model turn received.")
+                                first_turn = True
+                            for part in sc.model_turn.parts:
+                                if part.inline_data and part.inline_data.data:
 
-                await asyncio.sleep(0.05)
+                                    if len(turn_buf_24k) < self.MAX_TURN_BYTES_24K:
+                                        remaining = self.MAX_TURN_BYTES_24K - len(
+                                            turn_buf_24k
+                                        )
+                                        turn_buf_24k.extend(
+                                            part.inline_data.data[:remaining]
+                                        )
+                                    # else: hard-cap reached; ignore rest of this turn's audio
+
+                        # 3) On turn complete: enqueue ONE blob + sentinel to reset resampler
+                        if sc and sc.turn_complete:
+                            self.logger.info("Turn complete.")
+                            self.first_turn = False
+                            if turn_buf_24k:
+                                await self.audio_q.put(bytes(turn_buf_24k))
+                                turn_buf_24k.clear()
+                            await self.audio_q.put(self._TURN_END)
+
+                        # Prevent starvation if receive() is "hot"
+                        await asyncio.sleep(0)
+
+            finally:
+                player_task.cancel()
 
     # -------------------------------------------------------------------------
     # Entry point
