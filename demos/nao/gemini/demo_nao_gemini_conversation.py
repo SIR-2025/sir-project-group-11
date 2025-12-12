@@ -221,6 +221,8 @@ class NaoGeminiConversation(SICApplication):
         self.motion_name = None
         self.chain = None
 
+        self.emotion = None
+
         self.nao = None
         self.gemini_session = None
         self.loop = None
@@ -305,6 +307,8 @@ class NaoGeminiConversation(SICApplication):
                     self._execute_replay_logic, self.motion_name, self.chain
                 )
             )
+            self.emotion="Calm"
+            self.display_emotion()
         else:
             self.logger.error(f"Motion {type} not found in motion chains!")
 
@@ -320,6 +324,25 @@ class NaoGeminiConversation(SICApplication):
             # self.nao.autonomous.request(NaoRestRequest())
         except Exception as e:
             self.logger.error(f"Error replaying motion: {e}")
+
+    def display_emotion(self):
+        """
+        Helper function to announce an emotion and set the LEDs.
+        """
+        if self.shutdown_event.is_set():
+            return
+        
+        emotions = {
+            "Happy": (0.0, 1.0, 0.0, "I am feeling happy!"),        # Gold/Orange
+            "Angry": (1.0, 0.0, 0.0, "I am feeling angry!"),        # Red
+            "Calm": (1.0, 1.0, 1.0, "I am feeling calm."),          # White
+        }
+
+        self.logger.info(f"Displaying emotion: {self.emotion}")
+
+        r, g, b, _ = emotions[self.emotion]
+        self.nao.leds.request(NaoFadeRGBRequest("FaceLeds", r, g, b, 0.5))
+        self.nao.leds.request(NaoFadeRGBRequest("ChestLeds", r, g, b, 0.5))
 
     # -------------------------------------------------------------------------
     # Audio capture from NAO → Gemini
@@ -388,7 +411,16 @@ class NaoGeminiConversation(SICApplication):
 
             if name == "show_expression":
                 type = args.get("type")
+                if "positive_reactions" in self.motion_name:
+                    self.emotion = "Happy"
+                elif "neutral_reactions" in self.motion_name:
+                    self.emotion = "Calm"
+                elif "negative_reactions" in self.motion_name:
+                    self.emotion = "Angry"
+                self.display_emotion()
                 await self.perform_expression(type)
+                
+
                 function_responses.append(
                     types.FunctionResponse(
                         id=call_id,
@@ -458,7 +490,9 @@ class NaoGeminiConversation(SICApplication):
     # Gemini Live main loop
     # -------------------------------------------------------------------------
     async def run_gemini(self):
-        client = genai.Client()
+        # client = genai.Client(api_key="AIzaSyDMC5xGiIN-9aGHXouWHWC-Ht8x5Qobzu4")
+        # model = "gemini-live-2.5-flash-preview"
+        client = genai.Client(api_key="AIzaSyCCYOfubvBcCCUJAOOzxuAoO3FxltMEqi0")
         model = "gemini-2.5-flash-native-audio-preview-09-2025"
 
         # Define the dance tool for the model
