@@ -370,7 +370,7 @@ class NaoGeminiConversation(SICApplication):
             asyncio.to_thread(self._execute_replay_logic, full_path, chain)
         )
 
-        self.emotion = "Calm"
+        self.emotion = "Neutral"
         self.display_emotion()
 
     def _execute_replay_logic(self, motion_name, chain):
@@ -393,7 +393,8 @@ class NaoGeminiConversation(SICApplication):
         emotions = {
             "Happy": (0.0, 1.0, 0.0, "I am feeling happy!"),  # Green
             "Angry": (1.0, 0.0, 0.0, "I am feeling angry!"),  # Red
-            "Calm": (1.0, 1.0, 1.0, "I am feeling calm."),  # White
+            "Calm": (0, 0, 1.0, "I am feeling calm."),  # Blue
+            "Neutral": (1.0, 1.0, 1.0, "I am feeling neutral."),  # White
         }
 
         self.logger.info(f"Displaying emotion: {self.emotion}")
