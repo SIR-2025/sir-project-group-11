@@ -231,6 +231,8 @@ class NaoGeminiConversation(SICApplication):
         self.model_is_speaking = False  # model is generating a response
         self.buffered_text = []  # chunks of TEXT from Live API
 
+        self.pending_expression = None
+
         self.resample_state = None
         self.BATCH_SIZE_THRESHOLD = 24000
 
@@ -307,7 +309,7 @@ class NaoGeminiConversation(SICApplication):
                     self._execute_replay_logic, self.motion_name, self.chain
                 )
             )
-            self.emotion="Calm"
+            self.emotion = "Calm"
             self.display_emotion()
         else:
             self.logger.error(f"Motion {type} not found in motion chains!")
@@ -331,11 +333,11 @@ class NaoGeminiConversation(SICApplication):
         """
         if self.shutdown_event.is_set():
             return
-        
+
         emotions = {
-            "Happy": (0.0, 1.0, 0.0, "I am feeling happy!"),        # Green
-            "Angry": (1.0, 0.0, 0.0, "I am feeling angry!"),        # Red
-            "Calm": (1.0, 1.0, 1.0, "I am feeling calm."),          # White
+            "Happy": (0.0, 1.0, 0.0, "I am feeling happy!"),  # Green
+            "Angry": (1.0, 0.0, 0.0, "I am feeling angry!"),  # Red
+            "Calm": (1.0, 1.0, 1.0, "I am feeling calm."),  # White
         }
 
         self.logger.info(f"Displaying emotion: {self.emotion}")
@@ -418,8 +420,8 @@ class NaoGeminiConversation(SICApplication):
                 elif "negative_reactions" in self.motion_name:
                     self.emotion = "Angry"
                 self.display_emotion()
-                await self.perform_expression(type)
-                
+                self.pending_expression = type
+                self.logger.info(f"Queued expression for end of turn: {type}")
 
                 function_responses.append(
                     types.FunctionResponse(
@@ -575,6 +577,8 @@ Order of events:
 4) During the match, react to Sof's commentary with short remarks and frequent use of the expression tool.
 5) At the end of the match, when Sof announces the final whistle, you disable tracking.
 6) You then enter a post-match analysis phase, providing your thoughts on the game with appropriate expressions after you have been prompted by Sof.
+
+Never call the expression tool multiple times in a row without any verbal commentary in between. Always say something before using the expression tool again.
 """
 
         config = {
@@ -638,6 +642,10 @@ Order of events:
                                 await self.audio_q.put(bytes(turn_buf_24k))
                                 turn_buf_24k.clear()
                             await self.audio_q.put(self._TURN_END)
+
+                            if self.pending_expression:
+                                await self.perform_expression(self.pending_expression)
+                                self.pending_expression = None
 
                         # Prevent starvation if receive() is "hot"
                         await asyncio.sleep(0)
