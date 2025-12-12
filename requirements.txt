@@ -1,0 +1,8 @@
+social-interaction-cloud>=2.1.0
+google-genai
+google-cloud-dialogflowcx
+google-auth
+opencv-python
+Pillow
+numpy
+python-dotenv

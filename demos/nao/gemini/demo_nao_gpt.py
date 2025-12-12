@@ -33,6 +33,7 @@ from sic_framework.devices.common_naoqi.naoqi_tracker import (
     StartTrackRequest,
     StopAllTrackRequest,
 )
+import os
 
 # Optional ASR dependency: faster-whisper
 #   pip install faster-whisper
@@ -283,7 +284,7 @@ class NaoGeminiConversation(SICApplication):
         self.vad = SimpleEnergyVAD(VADConfig(sample_rate=16000))
         self._vad_lock = asyncio.Lock()
 
-        self.client = genai.Client()
+        self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
         self.model = "gemini-2.5-flash"  # fast text model
 
         # Chat/session state for the text model
